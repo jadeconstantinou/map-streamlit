@@ -6,26 +6,22 @@ from typing import List
 import folium
 import streamlit as st
 from folium.plugins import Draw
-from mapa import convert_bbox_to_stl
-from mapa.caching import get_hash_of_geojson
-from mapa.utils import TMPDIR
+from mapa_streamlit import convert_bbox_to_tif
+from mapa_streamlit.caching import get_hash_of_geojson
+from mapa_streamlit.utils import TMPDIR
 from streamlit_folium import st_folium
 
 from mapa_streamlit.cleaning import run_cleanup_job
 from mapa_streamlit.settings import (
-    ABOUT,
-    BTN_LABEL_CREATE_STL,
-    BTN_LABEL_DOWNLOAD_STL,
+    BTN_LABEL_CREATE_TIF,
+    BTN_LABEL_DOWNLOAD_TIFS,
     DEFAULT_TILING_FORMAT,
     DISK_CLEANING_THRESHOLD,
     MAP_CENTER,
     MAP_ZOOM,
     MAX_ALLOWED_AREA_SIZE,
-    ModelSizeSlider,
-    SquaredCheckbox,
     TilingSelect,
-    ZOffsetSlider,
-    ZScaleSlider,
+    
 )
 from mapa_streamlit.verification import selected_bbox_in_boundary, selected_bbox_too_large
 
@@ -57,27 +53,27 @@ def _show_map(center: List[float], zoom: int) -> folium.Map:
     return m
 
 
-def _compute_stl(geometry: dict, progress_bar: st.progress) -> None:
+def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collection,user_defined_bands) -> None:
     geo_hash = get_hash_of_geojson(geometry)
     mapa_cache_dir = TMPDIR()
     run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
     path = mapa_cache_dir / geo_hash
     progress_bar.progress(0)
-    convert_bbox_to_stl(
+    convert_bbox_to_tif(
+        user_defined_collection=user_defined_collection, 
+        user_defined_bands=user_defined_bands,
         bbox_geometry=geometry,
-        model_size=ModelSizeSlider.value if model_size is None else model_size,
-        z_scale=ZScaleSlider.value if z_scale is None else z_scale,
-        z_offset=ZOffsetSlider.value if z_offset is None else z_offset,
-        ensure_squared=ensure_squared,
         output_file=path,
         progress_bar=progress_bar,
         split_area_in_tiles=DEFAULT_TILING_FORMAT if tiling_option is None else tiling_option,
     )
     # it is important to spawn this success message in the sidebar, because state will get lost otherwise
-    st.sidebar.success("Successfully computed STL file!")
+    st.sidebar.success("Successfully requested tif file!")
 
 
-def _check_area_and_compute_stl(folium_output: dict, geo_hash: str, progress_bar: st.progress) -> None:
+def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar: st.progress) -> None:
+    user_defined_collection=st.session_state.selected_collection
+    user_defined_bands=st.session_state.selected_bands
     all_drawings_dict = {
         get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
     }
@@ -93,12 +89,12 @@ def _check_area_and_compute_stl(folium_output: dict, geo_hash: str, progress_bar
             "right. Ensure to use the initial center view of the world for drawing your rectangle."
         )
     else:
-        _compute_stl(geometry, progress_bar)
+        _compute_tif(geometry, progress_bar,user_defined_collection, user_defined_bands)
 
 
 def _download_btn(data: str, disabled: bool) -> None:
     st.sidebar.download_button(
-        label=BTN_LABEL_DOWNLOAD_STL,
+        label=BTN_LABEL_DOWNLOAD_TIFS,
         data=data,
         file_name=f'{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_mapa-streamlit.zip',
         disabled=disabled,
@@ -131,13 +127,13 @@ if __name__ == "__main__":
         page_icon="🌍",
         layout="wide",
         initial_sidebar_state="expanded",
-        menu_items={"About": ABOUT},
+      
     )
 
     st.markdown(
         """
-        # mapa &nbsp; 🌍 &nbsp; Map to STL Converter
-        Follow the instructions in the sidebar on the left to create and download a 3D-printable STL file.
+        # &nbsp; 🌍 &nbsp; Open data download app 
+        Follow the instructions in the sidebar on the left to create and download tifs.
         """,
         unsafe_allow_html=True,
     )
@@ -158,28 +154,37 @@ if __name__ == "__main__":
 
     # Getting Started container
     with st.sidebar.container():
+        if 'selected_collection' not in st.session_state:
+            st.session_state.selected_collection=st.selectbox("Select a collection", ("sentinel-2-l2a","landsat-c2-l2"))   
+        else:
+            st.session_state.selected_collection=st.selectbox("Select a collection", ("sentinel-2-l2a","landsat-c2-l2"))   
+
+        if 'selected_bands' not in st.session_state:
+            st.session_state.selected_bands=st.selectbox("Select bands", ("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"))
+        else:
+            st.session_state.selected_bands=st.selectbox("Select bands", ("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"))
+
         st.markdown(
             f"""
             # Getting Started
             1. Zoom to your region of interest
             2. Click the black square on the map
             3. Draw a rectangle on the map
-            4. Optional: Apply customizations below
-            5. Click on <kbd>{BTN_LABEL_CREATE_STL}</kbd>
+            4. Click on <kbd>{BTN_LABEL_CREATE_TIF}</kbd>
             """,
             unsafe_allow_html=True,
         )
         st.button(
-            BTN_LABEL_CREATE_STL,
-            key="create_stl",
-            on_click=_check_area_and_compute_stl,
+            BTN_LABEL_CREATE_TIF,
+            key="create_tif",
+            on_click=_check_area_and_compute_tif,
             kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar},
             disabled=False if geo_hash else True,
         )
         st.markdown(
             f"""
             5. Wait for the computation to finish
-            6. Click on <kbd>{BTN_LABEL_DOWNLOAD_STL}</kbd>
+            6. Click on <kbd>{BTN_LABEL_DOWNLOAD_TIFS}</kbd>
             """,
             unsafe_allow_html=True,
         )
@@ -193,41 +198,15 @@ if __name__ == "__main__":
 
         st.sidebar.markdown("---")
 
-    # Customization container
+     # Customization container
     with st.sidebar.container():
         st.write(
-            """
-            # Customization
-            Use below options to customize the output:
-            """
-        )
-        z_offset = st.slider(
-            label=ZOffsetSlider.label,
-            min_value=ZOffsetSlider.min_value,
-            max_value=ZOffsetSlider.max_value,
-            value=ZOffsetSlider.value,
-            help=ZOffsetSlider.help,
-        )
-        z_scale = st.slider(
-            label=ZScaleSlider.label,
-            min_value=ZScaleSlider.min_value,
-            max_value=ZScaleSlider.max_value,
-            value=ZScaleSlider.value,
-            step=ZScaleSlider.step,
-            help=ZScaleSlider.help,
-        )
-        model_size = st.slider(
-            label=ModelSizeSlider.label,
-            min_value=ModelSizeSlider.min_value,
-            max_value=ModelSizeSlider.max_value,
-            value=ModelSizeSlider.value,
-            step=ModelSizeSlider.step,
-            help=ModelSizeSlider.help,
-        )
-        ensure_squared = st.checkbox(
-            label=SquaredCheckbox.label,
-            help=SquaredCheckbox.help,
-        )
+             """
+             # Customization
+             Use below options to customize the output:
+             """
+         )
+ 
         tiling_option = st.selectbox(
             label=TilingSelect.label,
             options=TilingSelect.options,
