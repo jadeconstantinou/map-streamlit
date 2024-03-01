@@ -121,6 +121,11 @@ def _get_active_drawing_hash(state, drawings: List[str]) -> str:
         return state.active_drawing
 
 
+collection_data = {
+    'sentinel-2-l2a':("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"),
+    'landsat-c2-l2':("qa","red","blue","drad","emis","emsd","trad","urad","atran","cdist","green","nir08","lwir11","swir16","swir22","coastal","qa_pixel","qa_radsat","qa_aerosol","cloud_qa","lwir","atmos_opacity"),
+}
+
 if __name__ == "__main__":
     st.set_page_config(
         page_title="mapa",
@@ -152,17 +157,31 @@ if __name__ == "__main__":
     progress_bar = st.sidebar.progress(0)
     progress_bar.empty()
 
+    # # Getting Started container
+    # with st.sidebar.container():
+    #     if 'selected_collection' not in st.session_state:
+    #         st.session_state.selected_collection=st.selectbox("Select a collection", ("sentinel-2-l2a","landsat-c2-l2"))   
+    #     else:
+    #         st.session_state.selected_collection=st.selectbox("Select a collection", ("sentinel-2-l2a","landsat-c2-l2"))   
+
+    #     if 'selected_bands' not in st.session_state:
+    #         st.session_state.selected_bands=st.selectbox("Select bands", ("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"))
+    #     else:
+    #         st.session_state.selected_bands=st.selectbox("Select bands", ("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"))
+
+
     # Getting Started container
     with st.sidebar.container():
         if 'selected_collection' not in st.session_state:
-            st.session_state.selected_collection=st.selectbox("Select a collection", ("sentinel-2-l2a","landsat-c2-l2"))   
-        else:
-            st.session_state.selected_collection=st.selectbox("Select a collection", ("sentinel-2-l2a","landsat-c2-l2"))   
-
+            st.session_state.selected_collection = st.selectbox('Select a collection', (collection_data.keys()))
         if 'selected_bands' not in st.session_state:
-            st.session_state.selected_bands=st.selectbox("Select bands", ("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"))
+            st.session_state.selected_bands = st.multiselect('Select bands', collection_data[st.session_state.selected_collection])
         else:
-            st.session_state.selected_bands=st.selectbox("Select bands", ("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"))
+            selected_collection= st.selectbox('Select a collection', (collection_data.keys()))
+            st.session_state.selected_collection =selected_collection
+
+            if st.session_state.selected_collection != 'select':
+                st.session_state.selected_bands = st.multiselect('Select bands', collection_data[selected_collection])
 
         st.markdown(
             f"""
@@ -176,7 +195,7 @@ if __name__ == "__main__":
         )
         st.button(
             BTN_LABEL_CREATE_TIF,
-            key="create_tif",
+            key="find_tifs",
             on_click=_check_area_and_compute_tif,
             kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar},
             disabled=False if geo_hash else True,

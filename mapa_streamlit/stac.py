@@ -41,6 +41,65 @@ def _turn_geojson_into_bbox(geojson_bbox: dict) -> List[float]:
     return _bbox(list(geojson.utils.coords(geojson.Polygon(coordinates))))
 
 
+
+
+def save_tifs_with_one_band(filepath, bands, collection, meta, xx):
+    paths=[]
+
+    for arr in xx[bands]:
+        print(arr)
+        print(type(arr))
+        print("~~~~~~~~~~~",arr.time.values)
+        filename=Path(collection+"_"
+                + pd.to_datetime(arr.time.values)
+                .to_pydatetime()
+                .strftime("%Y-%m-%d_%H-%M-%S")
+                + ".tif")
+        with rio.open(
+                filepath/filename,
+                "w",
+                **meta,
+                bands= bands, 
+                collection= collection,
+                driver="COG",
+            ) as dst:
+            dst.write(arr.values, 1)
+            dst.set_band_description(1,bands)
+                
+            paths.append(filepath/filename)
+    return paths
+
+
+
+def save_tifs_with_three_bands(filepath, bands, collection, meta, xx):
+    paths=[]
+
+    rgb_array = np.stack([xx[bands[2]].values, xx[bands[1]].values, xx[bands[0]].values], axis=-1)
+    rgb = {0: "red", 1: "green", 2: "blue"}
+
+    for i, arr in enumerate(rgb_array):
+
+        filename=Path(collection+"_"
+                + pd.to_datetime(arr.time.values)
+                .to_pydatetime()
+                .strftime("%Y-%m-%d_%H-%M-%S")
+                + ".tif")
+        
+        with rio.open(
+            filepath/filename,
+            "w",
+            **meta,
+        ) as dst:
+            for j in range(meta["count"]):
+                print(j)
+                dst.write(arr[:, :, j], j + 1)
+                dst.set_band_description(j+1,rgb[j])  
+
+                paths.append(filepath/filename)
+    return paths
+                    
+
+
 def save_images_from_xarr(xarray, filepath, bands:str, collection:str, datatype="float32"):
    
     count=len([bands])
@@ -67,34 +126,12 @@ def save_images_from_xarr(xarray, filepath, bands:str, collection:str, datatype=
     if count == 1 :
         #bands_str=', '.join(map(str, bands))
         paths=save_tifs_with_one_band(filepath, bands, collection, meta, xx)
+
+    if count==3:
+        paths=save_tifs_with_three_bands(filepath, bands, collection, meta, xx)
  
     print("------------",paths)            
     return paths
-
-def save_tifs_with_one_band(filepath, bands, collection, meta, xx):
-    paths=[]
-
-    for arr in xx[bands]:
-        print("~~~~~~~~~~~",arr.time.values)
-        filename=Path(collection+"_"
-                + pd.to_datetime(arr.time.values)
-                .to_pydatetime()
-                .strftime("%Y-%m-%d_%H-%M-%S")
-                + ".tif")
-        with rio.open(
-                filepath/filename,
-                "w",
-                **meta,
-                bands= bands, 
-                collection= collection,
-                driver="COG",
-            ) as dst:
-            dst.write(arr.values, 1)
-            dst.set_band_description(1,bands)
-                
-            paths.append(filepath/filename)
-    return paths
-                        
 
 def fetch_stac_items_for_bbox(
     user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, progress_bar: Union[None, ProgressBar] = None
@@ -147,3 +184,5 @@ def fetch_stac_items_for_bbox(
         return files
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box.")
+
+
