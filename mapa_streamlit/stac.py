@@ -137,3 +137,21 @@ def fetch_stac_items_for_bbox(
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box.")
 
 
+def get_band_metadata(collection:str):
+    catalog = pystac_client.Client.open(
+    "https://planetarycomputer.microsoft.com/api/stac/v1",
+    modifier=planetary_computer.sign_inplace,
+)
+    if collection == "landsat-c2-l2":
+        landsat = catalog.get_collection("landsat-c2-l2")
+        landsat_df1=pd.DataFrame(landsat.summaries.get_list("eo:bands"))
+        landsat_df2=pd.DataFrame.from_dict(landsat.extra_fields["item_assets"], orient="index")[["title", "description", "gsd"]]
+        landsat_df2.columns.name = 'common_name'
+        landsat_df2=landsat_df2.drop(columns=["description","title"])
+        df = pd.merge(landsat_df1, landsat_df2, left_on='common_name', right_on='common_name', right_index=True, how='inner')
+    
+    else:
+        sentinel= catalog.get_collection("sentinel-2-l2a")
+        df=pd.DataFrame(sentinel.summaries.get_list("eo:bands"))
+    
+    return df

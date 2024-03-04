@@ -6,8 +6,8 @@ from mapa_streamlit import __version__
 MAP_CENTER = [25.0, 55.0]
 MAP_ZOOM = 3
 
-BTN_LABEL_CREATE_TIF = "Create .tif"
-BTN_LABEL_DOWNLOAD_TIFS = "Download .tif"
+BTN_LABEL_CREATE_TIF = "Click to request data"
+BTN_LABEL_DOWNLOAD_TIFS = "CLick to download .tifs"
 
 MAX_ALLOWED_AREA_SIZE = 25.0
 

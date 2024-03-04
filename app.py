@@ -8,6 +8,7 @@ import streamlit as st
 from folium.plugins import Draw
 from mapa_streamlit import convert_bbox_to_tif
 from mapa_streamlit.caching import get_hash_of_geojson
+from mapa_streamlit.stac import get_band_metadata
 from mapa_streamlit.utils import TMPDIR
 from streamlit_folium import st_folium
 
@@ -126,6 +127,9 @@ collection_data = {
     'landsat-c2-l2':("qa","red","blue","drad","emis","emsd","trad","urad","atran","cdist","green","nir08","lwir11","swir16","swir22","coastal","qa_pixel","qa_radsat","qa_aerosol","cloud_qa","lwir","atmos_opacity"),
 }
 
+# def update_band_table(collection:str):
+#     df=get_band_metadata(collection)
+
 if __name__ == "__main__":
     st.set_page_config(
         page_title="mapa",
@@ -156,18 +160,6 @@ if __name__ == "__main__":
     # ensure progress bar resides at top of sidebar and is invisible initially
     progress_bar = st.sidebar.progress(0)
     progress_bar.empty()
-
-    # # Getting Started container
-    # with st.sidebar.container():
-    #     if 'selected_collection' not in st.session_state:
-    #         st.session_state.selected_collection=st.selectbox("Select a collection", ("sentinel-2-l2a","landsat-c2-l2"))   
-    #     else:
-    #         st.session_state.selected_collection=st.selectbox("Select a collection", ("sentinel-2-l2a","landsat-c2-l2"))   
-
-    #     if 'selected_bands' not in st.session_state:
-    #         st.session_state.selected_bands=st.selectbox("Select bands", ("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"))
-    #     else:
-    #         st.session_state.selected_bands=st.selectbox("Select bands", ("AOT","B01","B02","B03","B04","B05","B06","B07","B08","B09","B11","B12","B8A","SCL","WVP","visual"))
 
 
     # Getting Started container
@@ -221,13 +213,14 @@ if __name__ == "__main__":
     with st.sidebar.container():
         st.write(
              """
-             # Customization
-             Use below options to customize the output:
+             # Metadata
+             Please view the table below for more information about your band selection
              """
          )
+        
+        df=get_band_metadata(selected_collection)
+        st.table(df)
+        
  
-        tiling_option = st.selectbox(
-            label=TilingSelect.label,
-            options=TilingSelect.options,
-            help=TilingSelect.help,
-        )
+
+        

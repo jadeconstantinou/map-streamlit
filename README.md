@@ -1,17 +1,6 @@
 # mapa-streamlit 🌍
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://3dmaps.streamlitapp.com)
-[![Python Tests](https://github.com/fgebhart/mapa-streamlit/actions/workflows/test.yml/badge.svg)](https://github.com/fgebhart/mapa-streamlit/actions/workflows/test.yml)
-
-A [streamlit web app](https://3dmaps.streamlitapp.com) which let's you create 3D-printable
-STL files using satellite elevation data ([ALOS DEM](https://planetarycomputer.microsoft.com/dataset/alos-dem)) based on
-[mapa](https://github.com/fgebhart/mapa).
-
-This repo contains the source code of the streamlit web app, whereas the
-[mapa repository](https://github.com/fgebhart/mapa) contains the source code of the algorithm which is responsible for
-generating STL files.
-
-![](https://i.imgur.com/WRwXpeE.png)
+This app was built by using Fabien Gebhart's mapa repo https://github.com/fgebhart/mapa as a foundation to enable this app to be created with more functionalities such as requesting more data from different collections and different bands.
 
 
 ## Development & Contributions
