@@ -44,8 +44,10 @@ def _turn_geojson_into_bbox(geojson_bbox: dict) -> List[float]:
 
 
 def save_tifs_with_one_band(filepath, bands, collection, meta, xx):
+    
     paths=[]
 
+    #print(xx[bands].time.values)
     for arr in xx[bands]:
         print(arr)
         print(type(arr))
@@ -100,9 +102,9 @@ def save_tifs_with_three_bands(filepath, bands, collection, meta, xx):
                     
 
 
-def save_images_from_xarr(xarray, filepath, bands:str, collection:str, datatype="float32"):
+def save_images_from_xarr(xarray, filepath, bands, collection:str, datatype="float32"):
    
-    count=len([bands])
+    count=len(bands)
     xarray.rio.set_crs(int(xarray.spatial_ref.values))
     tf = xarray.rio.transform()
     crs = xarray.rio.crs
@@ -119,18 +121,15 @@ def save_images_from_xarr(xarray, filepath, bands:str, collection:str, datatype=
     }
     
     xx=xarray.squeeze()
-    print(type(bands))
-  
-    print(len([bands]))
+   
 
     if count == 1 :
-        #bands_str=', '.join(map(str, bands))
-        paths=save_tifs_with_one_band(filepath, bands, collection, meta, xx)
+        bands_str=', '.join(map(str, bands))
+        paths=save_tifs_with_one_band(filepath, bands_str, collection, meta, xx)
 
     if count==3:
         paths=save_tifs_with_three_bands(filepath, bands, collection, meta, xx)
- 
-    print("------------",paths)            
+           
     return paths
 
 def fetch_stac_items_for_bbox(
