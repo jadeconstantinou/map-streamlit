@@ -120,11 +120,11 @@ def _download_tifs_btn(data: str, disabled: bool) -> None:
 def _download_gifs_btn(data: str, disabled: bool) -> None:
     st.sidebar.download_button(
             label=BTN_LABEL_DOWNLOAD_GIFS,
-            key="make_gif",
+            #key="make_gif",
             data=data,
-            on_click=_compute_gif,
+            #on_click=_compute_gif,
             file_name='gif_streamlit.zip',
-            kwargs={"folium_output": output, "geo_hash": geo_hash},
+            #kwargs={"folium_output": output, "geo_hash": geo_hash},
             disabled=False if geo_hash else True,
         )
     
@@ -234,16 +234,22 @@ if __name__ == "__main__":
         else:
             _download_tifs_btn(b"None", True)
            
+        
+
 
         output_gif_file = TMPDIR() / f"{geo_hash}.zip"
         if output_gif_file.is_file():
+            gif_bytes=_compute_gif(output, geo_hash)
+            with open(output_gif_file, "wb") as f:
+                f.write(gif_bytes)
+            
             with open(output_gif_file, "rb") as fp:
                 _download_gifs_btn(fp, False)
         else:
             _download_gifs_btn(b"None", True)
             
 
-        st.subheader('Download')
+        # st.subheader('Download')
 
         
         # gif_file=_compute_gif(output, geo_hash)
