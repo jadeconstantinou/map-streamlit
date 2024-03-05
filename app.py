@@ -1,20 +1,24 @@
+import base64
 import datetime
+import io
 import logging
 import os
 from typing import List
+import zipfile
 
 import folium
 import streamlit as st
 from folium.plugins import Draw
 from mapa_streamlit import convert_bbox_to_tif
 from mapa_streamlit.caching import get_hash_of_geojson
-from mapa_streamlit.stac import get_band_metadata
+from mapa_streamlit.stac import create_gif, get_band_metadata
 from mapa_streamlit.utils import TMPDIR
 from streamlit_folium import st_folium
 
 from mapa_streamlit.cleaning import run_cleanup_job
 from mapa_streamlit.settings import (
     BTN_LABEL_CREATE_TIF,
+    BTN_LABEL_DOWNLOAD_GIFS,
     BTN_LABEL_DOWNLOAD_TIFS,
     DEFAULT_TILING_FORMAT,
     DISK_CLEANING_THRESHOLD,
@@ -93,14 +97,37 @@ def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar
         _compute_tif(geometry, progress_bar,user_defined_collection, user_defined_bands)
 
 
-def _download_btn(data: str, disabled: bool) -> None:
+def _compute_gif(folium_output: dict, geo_hash: str):
+    
+    user_defined_collection=st.session_state.selected_collection
+    user_defined_bands=st.session_state.selected_bands
+
+    all_drawings_dict = {
+        get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
+    }
+    geometry = all_drawings_dict[geo_hash]
+    gif=create_gif(geometry,user_defined_collection,user_defined_bands)
+    return gif
+
+def _download_tifs_btn(data: str, disabled: bool) -> None:
     st.sidebar.download_button(
         label=BTN_LABEL_DOWNLOAD_TIFS,
         data=data,
-        file_name=f'{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_mapa-streamlit.zip',
+        file_name=f'{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_streamlit.zip',
         disabled=disabled,
     )
 
+def _download_gifs_btn(data: str, disabled: bool) -> None:
+    st.sidebar.download_button(
+            label=BTN_LABEL_DOWNLOAD_GIFS,
+            key="make_gif",
+            data=data,
+            on_click=_compute_gif,
+            file_name='gif_streamlit.zip',
+            kwargs={"folium_output": output, "geo_hash": geo_hash},
+            disabled=False if geo_hash else True,
+        )
+    
 
 def _get_active_drawing_hash(state, drawings: List[str]) -> str:
     # update state initially
@@ -127,17 +154,15 @@ collection_data = {
     'landsat-c2-l2':("qa","red","blue","drad","emis","emsd","trad","urad","atran","cdist","green","nir08","lwir11","swir16","swir22","coastal","qa_pixel","qa_radsat","qa_aerosol","cloud_qa","lwir","atmos_opacity"),
 }
 
-# def update_band_table(collection:str):
-#     df=get_band_metadata(collection)
 
 if __name__ == "__main__":
     st.set_page_config(
         page_title="mapa",
         page_icon="🌍",
         layout="wide",
-        initial_sidebar_state="expanded",
-      
+        initial_sidebar_state="expanded",      
     )
+
 
     st.markdown(
         """
@@ -196,16 +221,45 @@ if __name__ == "__main__":
             f"""
             5. Wait for the computation to finish
             6. Click on <kbd>{BTN_LABEL_DOWNLOAD_TIFS}</kbd>
+            or <kbd>{BTN_LABEL_DOWNLOAD_GIFS}</kbd>
             """,
             unsafe_allow_html=True,
         )
 
-        output_file = TMPDIR() / f"{geo_hash}.zip"
-        if output_file.is_file():
-            with open(output_file, "rb") as fp:
-                _download_btn(fp, False)
+        
+        output_tifs_file = TMPDIR() / f"{geo_hash}.zip"
+        if output_tifs_file.is_file():
+            with open(output_tifs_file, "rb") as fp:
+                _download_tifs_btn(fp, False)
         else:
-            _download_btn(b"None", True)
+            _download_tifs_btn(b"None", True)
+           
+
+        output_gif_file = TMPDIR() / f"{geo_hash}.zip"
+        if output_gif_file.is_file():
+            with open(output_gif_file, "rb") as fp:
+                _download_gifs_btn(fp, False)
+        else:
+            _download_gifs_btn(b"None", True)
+            
+
+        st.subheader('Download')
+
+        
+        # gif_file=_compute_gif(output, geo_hash)
+
+        # def save_to_zip(gif_file, zip_filename):
+        #     with zipfile.ZipFile(zip_filename, 'w') as zipf:
+        #         zipf.write(gif_file, os.path.basename(gif_file))
+
+        # if st.button("Save to ZIP"):
+        #     zip_filename="my_gif.zip"
+        #     save_to_zip(gif_file, zip_filename)
+        #     st.success(f"{gif_file.name} saved to {zip_filename}")
+                
+        
+
+
 
         st.sidebar.markdown("---")
 
@@ -218,9 +272,18 @@ if __name__ == "__main__":
              """
          )
         
-        df=get_band_metadata(selected_collection)
-        st.table(df)
+        selected_collection=st.session_state.selected_collection 
         
- 
+        if 'selected_collection' not in st.session_state:
+            selected_collection = st.table(get_band_metadata(selected_collection))
+        else:
+            selected_collection= st.table(get_band_metadata(selected_collection))
+           
+
+        tiling_option = st.selectbox(
+            label=TilingSelect.label,
+            options=TilingSelect.options,
+            help=TilingSelect.help,
+        )
 
         

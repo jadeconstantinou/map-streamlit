@@ -10,16 +10,20 @@ import pandas as pd
 import numpy as np
 import rioxarray
 from pathlib import Path
+from geogif import dgif
 
 
 import geojson
 from pystac.item import Item
 from pystac_client import Client
+import stackstac
 
 from mapa_streamlit import conf
 from mapa_streamlit.exceptions import NoSTACItemFound
-from mapa_streamlit.utils import ProgressBar
+from mapa_streamlit.utils import TMPDIR, ProgressBar
 import pystac_client
+
+from mapa_streamlit.zip import create_zip_archive
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
     import planetary_computer
@@ -62,20 +66,17 @@ def save_images_from_xarr(xarray, filepath, bands:list, collection:str, datatype
     key = {i: bands[i] for i in range(len(bands))}
 
     for i, arr in enumerate(rgb_array):
-        print("type arr" , type(arr))
         filename=Path(collection+"_"
             + pd.to_datetime(xarray[bands[0]].time.values[i])
             .to_pydatetime()
             .strftime("%Y-%m-%d_%H-%M-%S")
             + ".tif")
-        print("arr",arr)
         with rio.open(
         filepath/filename,
         "w",
         **meta,
         ) as dst:
             for j in range(meta["count"]):
-                print(j)
                 dst.write(arr[:, :, j], j + 1)
                 dst.set_band_description(j+1,key[j])   
 
@@ -88,22 +89,7 @@ def fetch_stac_items_for_bbox(
     user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, progress_bar: Union[None, ProgressBar] = None
 ) -> List[Path]:
     
-    bbox = _turn_geojson_into_bbox(geojson)
-    
-    catalog = pystac_client.Client.open(
-        conf.PLANETARY_COMPUTER_API_URL,
-        modifier=planetary_computer.sign_inplace,
-    )
-
-    search = catalog.search(
-        collections=[user_defined_collection],  # landsat-c2-l2, sentinel-2-l2a
-        bbox=bbox,
-        datetime="2023-10-20/2023-10-28",
-        query={
-            "eo:cloud_cover": {"lt": 20},
-        },
-    )
-    items = search.get_all_items()
+    items = search_stac_for_items(user_defined_collection, geojson)
 
     patch_url = None
     if are_stac_items_planetary_computer(items):
@@ -136,10 +122,29 @@ def fetch_stac_items_for_bbox(
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box.")
 
+def search_stac_for_items(user_defined_collection, geojson):
+    bbox = _turn_geojson_into_bbox(geojson)
+    
+    catalog = pystac_client.Client.open(
+        conf.PLANETARY_COMPUTER_API_URL,
+        modifier=planetary_computer.sign_inplace,
+    )
+
+    search = catalog.search(
+        collections=[user_defined_collection],  # landsat-c2-l2, sentinel-2-l2a
+        bbox=bbox,
+        datetime="2023-09-20/2023-10-28",
+        query={
+            "eo:cloud_cover": {"lt": 20},
+        },
+    )
+    items = search.get_all_items()
+    return items
+
 
 def get_band_metadata(collection:str):
     catalog = pystac_client.Client.open(
-    "https://planetarycomputer.microsoft.com/api/stac/v1",
+    conf.PLANETARY_COMPUTER_API_URL,
     modifier=planetary_computer.sign_inplace,
 )
     if collection == "landsat-c2-l2":
@@ -155,3 +160,26 @@ def get_band_metadata(collection:str):
         df=pd.DataFrame(sentinel.summaries.get_list("eo:bands"))
     
     return df
+
+def filter(bands,resolution,items,bbox,perc_thresh):
+    stack = stackstac.stack(items, bounds_latlon=bbox, resolution=resolution,epsg=None)
+
+    data = stack.sel(band=bands)
+
+    pixel_thresh = perc_thresh/100 * data['x'].shape[0] *data['y'].shape[0] * len(bands)
+    nodata_filtered = data.dropna('time', thresh=int(pixel_thresh))
+
+    ts = nodata_filtered.persist()
+    return ts
+
+def create_gif(geojson,user_defined_collection,user_defined_bands):
+
+    items=search_stac_for_items(user_defined_collection, geojson)
+    print("#########################items!:",items)
+    bbox = _turn_geojson_into_bbox(geojson)
+
+    ts=filter(user_defined_bands,10,items,bbox,perc_thresh=95) #check with band that is 30m if this 10m would work
+
+    gif=dgif(ts,fps=0.5,cmap="Greys",date_color=(0, 0, 0), date_bg=None, date_position="lr", date_format="%Y-%m-%d_%H:%M:%S", bytes=True).compute()
+    
+    return gif

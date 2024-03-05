@@ -30,13 +30,7 @@ def convert_bbox_to_tif(
     user_defined_collection:str,
     user_defined_bands:list,
     bbox_geometry: dict,
-    #as_ascii: bool = False,
-    #model_size: int = 200,
     output_file: str = "output",
-    #max_res: bool = False,
-    #z_offset: Union[None, float] = 0.0,
-    #z_scale: float = 1.0,
-    #ensure_squared: bool = False,
     split_area_in_tiles: str = "1x1",
     compress: bool = True,
     allow_caching: bool = True,
@@ -90,7 +84,7 @@ def convert_bbox_to_tif(
 
     args = locals().copy()
     args.pop("progress_bar", None)
-    log.info(f"⏳  converting bounding box to STL file with arguments: {args}")
+    log.info(f"⏳  converting bounding box to file with arguments: {args}")
 
     if progress_bar:
         steps = tiles.x * tiles.y * 2 if compress else tiles.x * tiles.y

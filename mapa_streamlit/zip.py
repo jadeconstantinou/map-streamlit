@@ -1,3 +1,4 @@
+import io
 import logging
 import zipfile
 from pathlib import Path
@@ -11,11 +12,17 @@ log = logging.getLogger(__name__)
 def create_zip_archive(
     files: List[Path], output_file: Union[str, Path], progress_bar: Union[ProgressBar, None] = None
 ) -> Path:
-    log.info(f"📦  compressing stl files: {[f.name for f in files]}")
+    log.info(f"📦  compressing files: {[f.name for f in files]}")
     with zipfile.ZipFile(output_file, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for f in files:
             zip_file.write(f, f.name)
             if progress_bar:
                 progress_bar.step()
-    log.info(f"✅  finished compressing STL files into: {output_file}")
+    log.info(f"✅  finished compressing files into: {output_file}")
+    return Path(output_file)
+
+def create_zipped_gif(geo_hash,gif,output_file: Union[str, Path]):
+    #zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(output_file, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        zip_file.writestr(f"{geo_hash}.gif", gif.read())
     return Path(output_file)
