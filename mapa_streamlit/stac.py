@@ -133,7 +133,7 @@ def search_stac_for_items(user_defined_collection, geojson):
     search = catalog.search(
         collections=[user_defined_collection],  # landsat-c2-l2, sentinel-2-l2a
         bbox=bbox,
-        datetime="2023-09-20/2023-10-28",
+        datetime="2023-10-20/2023-10-28",
         query={
             "eo:cloud_cover": {"lt": 20},
         },
@@ -172,14 +172,34 @@ def filter(bands,resolution,items,bbox,perc_thresh):
     ts = nodata_filtered.persist()
     return ts
 
-def create_gif(geojson,user_defined_collection,user_defined_bands):
+def save_gif(filepath,gif):
+    filename=Path("my_gif.gif")
+    with open(filepath/filename, "wb") as f:
+        f.write(gif)
+    path=filepath/filename
+    return path
+
+def create_and_save_gif(geojson,cache_dir,user_defined_collection,user_defined_bands)->Path:
 
     items=search_stac_for_items(user_defined_collection, geojson)
     print("#########################items!:",items)
+    print(len(items))
     bbox = _turn_geojson_into_bbox(geojson)
+    print(bbox)
 
     ts=filter(user_defined_bands,10,items,bbox,perc_thresh=95) #check with band that is 30m if this 10m would work
-
+    print(ts)
     gif=dgif(ts,fps=0.5,cmap="Greys",date_color=(0, 0, 0), date_bg=None, date_position="lr", date_format="%Y-%m-%d_%H:%M:%S", bytes=True).compute()
+    print(type(gif))
+    path=save_gif(cache_dir,gif)
+    print(path)
+
+    # if path.is_file():
+    #     with open(path, "wb") as f:
+    #         f.write(gif)
+    return path
+
+
+
+
     
-    return gif

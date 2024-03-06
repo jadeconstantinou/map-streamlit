@@ -21,8 +21,4 @@ def create_zip_archive(
     log.info(f"✅  finished compressing files into: {output_file}")
     return Path(output_file)
 
-def create_zipped_gif(geo_hash,gif,output_file: Union[str, Path]):
-    #zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(output_file, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-        zip_file.writestr(f"{geo_hash}.gif", gif.read())
-    return Path(output_file)
+

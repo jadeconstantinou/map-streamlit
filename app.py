@@ -11,7 +11,7 @@ import streamlit as st
 from folium.plugins import Draw
 from mapa_streamlit import convert_bbox_to_tif
 from mapa_streamlit.caching import get_hash_of_geojson
-from mapa_streamlit.stac import create_gif, get_band_metadata
+from mapa_streamlit.stac import create_and_save_gif, get_band_metadata
 from mapa_streamlit.utils import TMPDIR
 from streamlit_folium import st_folium
 
@@ -106,8 +106,9 @@ def _compute_gif(folium_output: dict, geo_hash: str):
         get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
     }
     geometry = all_drawings_dict[geo_hash]
-    gif=create_gif(geometry,user_defined_collection,user_defined_bands)
-    return gif
+    cache_dir= TMPDIR()
+    path=create_and_save_gif(geometry,cache_dir,user_defined_collection,user_defined_bands)
+    return path
 
 def _download_tifs_btn(data: str, disabled: bool) -> None:
     st.sidebar.download_button(
@@ -122,9 +123,8 @@ def _download_gifs_btn(data: str, disabled: bool) -> None:
             label=BTN_LABEL_DOWNLOAD_GIFS,
             #key="make_gif",
             data=data,
-            #on_click=_compute_gif,
-            file_name='gif_streamlit.zip',
-            #kwargs={"folium_output": output, "geo_hash": geo_hash},
+            on_click=_compute_gif,
+            kwargs={"folium_output": output, "geo_hash": geo_hash},
             disabled=False if geo_hash else True,
         )
     
@@ -233,21 +233,51 @@ if __name__ == "__main__":
                 _download_tifs_btn(fp, False)
         else:
             _download_tifs_btn(b"None", True)
-           
+
+        #if geo_hash is None: 
+        #    pass
+        #else:
+            
+        #output_gif_file = TMPDIR() / f"{geo_hash}.zip"   
+        output_tifs_file = TMPDIR() / "gif.zip"
+        if output_tifs_file.is_file():
+            with open(output_tifs_file, "rb") as fp:
+                st.sidebar.download_button(
+            label=BTN_LABEL_DOWNLOAD_GIFS,
+            #key="make_gif",
+            data=fp,
+            on_click=_compute_gif,
+            kwargs={"folium_output": output, "geo_hash": geo_hash},
+            disabled=False if geo_hash else True,
+        )
+                
+            #     st.sidebar.download_button(
+            # label=BTN_LABEL_DOWNLOAD_GIFS,
+            # #key="make_gif",
+            # #data=data,
+            # on_click=_compute_gif,
+            # kwargs={"folium_output": output, "geo_hash": geo_hash},
+            # disabled=False if geo_hash else True,
+        # )
         
 
 
-        output_gif_file = TMPDIR() / f"{geo_hash}.zip"
-        if output_gif_file.is_file():
-            gif_bytes=_compute_gif(output, geo_hash)
-            with open(output_gif_file, "wb") as f:
-                f.write(gif_bytes)
+        # output_gif_file = TMPDIR() / f"{geo_hash}.zip"
+        # if output_gif_file.is_file():
+        #     # gif_bytes=_compute_gif(output, geo_hash)
+        #     # with open(output_gif_file, "wb") as f:
+        #     #     f.write(gif_bytes)
             
-            with open(output_gif_file, "rb") as fp:
-                _download_gifs_btn(fp, False)
-        else:
-            _download_gifs_btn(b"None", True)
+        #     with open(output_gif_file, "rb") as fp:
+        #         _download_gifs_btn(fp, False)
+        # else:
+        #     _download_gifs_btn(b"None", True)
             
+
+
+
+
+
 
         # st.subheader('Download')
 
