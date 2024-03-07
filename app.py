@@ -11,7 +11,7 @@ import streamlit as st
 from folium.plugins import Draw
 from mapa_streamlit import convert_bbox_to_tif
 from mapa_streamlit.caching import get_hash_of_geojson
-from mapa_streamlit.stac import create_and_save_gif, get_band_metadata
+from mapa_streamlit.stac import create_and_save_gif, get_band_metadata, search_stac_for_items
 from mapa_streamlit.utils import TMPDIR
 from streamlit_folium import st_folium
 
@@ -107,8 +107,10 @@ def _compute_gif(folium_output: dict, geo_hash: str):
     }
     geometry = all_drawings_dict[geo_hash]
     cache_dir= TMPDIR()
-    path=create_and_save_gif(geometry,cache_dir,user_defined_collection,user_defined_bands)
-    return path
+    create_and_save_gif(geometry,cache_dir,user_defined_collection,user_defined_bands)
+    #print("THIS PATH IN COMPUTE_PATH,", path)
+    #return path
+    st.sidebar.success("Successfully zipped gif file!")
 
 def _download_tifs_btn(data: str, disabled: bool) -> None:
     st.sidebar.download_button(
@@ -128,6 +130,18 @@ def _download_gifs_btn(data: str, disabled: bool) -> None:
             disabled=False if geo_hash else True,
         )
     
+# def display_gif():
+#     """### gif from local file"""
+#     file_ = open("/home/rzwitch/Desktop/giphy.gif", "rb")
+#     contents = file_.read()
+#     data_url = base64.b64encode(contents).decode("utf-8")
+#     file_.close()
+
+#     st.markdown(
+#         f'<img src="data:image/gif;base64,{data_url}" alt="cat gif">',
+#         unsafe_allow_html=True,
+#     )
+        
 
 def _get_active_drawing_hash(state, drawings: List[str]) -> str:
     # update state initially
@@ -239,14 +253,17 @@ if __name__ == "__main__":
         #else:
             
         #output_gif_file = TMPDIR() / f"{geo_hash}.zip"   
-        output_tifs_file = TMPDIR() / "gif.zip"
-        if output_tifs_file.is_file():
-            with open(output_tifs_file, "rb") as fp:
+        output_gifs_file = TMPDIR() / "gif.zip"
+        if output_gifs_file.is_file():
+            with open(output_gifs_file, "rb") as fp:
+                gif_bytes = fp.read()
                 st.sidebar.download_button(
             label=BTN_LABEL_DOWNLOAD_GIFS,
             #key="make_gif",
-            data=fp,
+            data=gif_bytes,
+            file_name="gif.zip",
             on_click=_compute_gif,
+            mime="application/zip",
             kwargs={"folium_output": output, "geo_hash": geo_hash},
             disabled=False if geo_hash else True,
         )
@@ -259,7 +276,8 @@ if __name__ == "__main__":
             # kwargs={"folium_output": output, "geo_hash": geo_hash},
             # disabled=False if geo_hash else True,
         # )
-        
+                
+   
 
 
         # output_gif_file = TMPDIR() / f"{geo_hash}.zip"
@@ -279,21 +297,7 @@ if __name__ == "__main__":
 
 
 
-        # st.subheader('Download')
-
-        
-        # gif_file=_compute_gif(output, geo_hash)
-
-        # def save_to_zip(gif_file, zip_filename):
-        #     with zipfile.ZipFile(zip_filename, 'w') as zipf:
-        #         zipf.write(gif_file, os.path.basename(gif_file))
-
-        # if st.button("Save to ZIP"):
-        #     zip_filename="my_gif.zip"
-        #     save_to_zip(gif_file, zip_filename)
-        #     st.success(f"{gif_file.name} saved to {zip_filename}")
-                
-        
+     
 
 
 

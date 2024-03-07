@@ -23,7 +23,7 @@ from mapa_streamlit.exceptions import NoSTACItemFound
 from mapa_streamlit.utils import TMPDIR, ProgressBar
 import pystac_client
 
-from mapa_streamlit.zip import create_zip_archive
+from mapa_streamlit.zip import create_gif_zip_archive, create_zip_archive
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
     import planetary_computer
@@ -174,13 +174,13 @@ def filter(bands,resolution,items,bbox,perc_thresh):
 
 def save_gif(filepath,gif):
     filename=Path("my_gif.gif")
-    with open(filepath/filename, "wb") as f:
+    with open(filename, "wb") as f:
         f.write(gif)
-    path=filepath/filename
+    path=filename
     return path
 
-def create_and_save_gif(geojson,cache_dir,user_defined_collection,user_defined_bands)->Path:
-
+def create_and_save_gif(geojson,cache_dir,user_defined_collection,user_defined_bands,compress=True)->Path:
+    gif_path_list=[]
     items=search_stac_for_items(user_defined_collection, geojson)
     print("#########################items!:",items)
     print(len(items))
@@ -190,14 +190,16 @@ def create_and_save_gif(geojson,cache_dir,user_defined_collection,user_defined_b
     ts=filter(user_defined_bands,10,items,bbox,perc_thresh=95) #check with band that is 30m if this 10m would work
     print(ts)
     gif=dgif(ts,fps=0.5,cmap="Greys",date_color=(0, 0, 0), date_bg=None, date_position="lr", date_format="%Y-%m-%d_%H:%M:%S", bytes=True).compute()
-    print(type(gif))
     path=save_gif(cache_dir,gif)
+    gif_path_list.append(path)
     print(path)
+    output_file=TMPDIR()/"gif.zip"
+    if compress:
+        return create_gif_zip_archive(files=gif_path_list, output_file=output_file)
+    else:
+        return gif_path_list[0] if len(gif_path_list) == 1 else gif_path_list
 
-    # if path.is_file():
-    #     with open(path, "wb") as f:
-    #         f.write(gif)
-    return path
+    #return path,gif
 
 
 

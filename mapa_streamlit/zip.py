@@ -22,3 +22,13 @@ def create_zip_archive(
     return Path(output_file)
 
 
+
+def create_gif_zip_archive(
+    files: List[Path], output_file: Union[str, Path]
+) -> Path:
+    log.info(f"📦  compressing files: {[f.name for f in files]}")
+    with zipfile.ZipFile(output_file, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for f in files:
+            zip_file.write(f, f.name)
+    log.info(f"✅  finished compressing files into: {output_file}")
+    return Path(output_file)
