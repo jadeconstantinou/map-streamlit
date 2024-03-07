@@ -90,7 +90,7 @@ def convert_bbox_to_tif(
         steps = tiles.x * tiles.y * 2 if compress else tiles.x * tiles.y
         progress_bar = ProgressBar(progress_bar=progress_bar, steps=steps)
 
-    list_paths_to_tiffs=fetch_stac_items_for_bbox(user_defined_bands,
+    list_paths_to_tiffs,xx=fetch_stac_items_for_bbox(user_defined_bands,
     user_defined_collection,
     bbox_geometry,
     allow_caching,
@@ -105,6 +105,9 @@ def convert_bbox_to_tif(
         return create_zip_archive(files=list_paths_to_tiffs, output_file=f"{output_file}.zip", progress_bar=progress_bar)
     else:
         return list_paths_to_tiffs[0] if len(list_paths_to_tiffs) == 1 else list_paths_to_tiffs
+    
+
+
 
 def _get_version_from_project_toml():
     with open(Path(__file__).parent.parent / "pyproject.toml", "rb") as f:

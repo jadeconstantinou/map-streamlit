@@ -1,19 +1,18 @@
-import base64
 import datetime
-import io
 import logging
 import os
 from typing import List
-import zipfile
 
 import folium
+import pandas as pd
 import streamlit as st
 from folium.plugins import Draw
 from mapa_streamlit import convert_bbox_to_tif
 from mapa_streamlit.caching import get_hash_of_geojson
-from mapa_streamlit.stac import create_and_save_gif, get_band_metadata, search_stac_for_items
+from mapa_streamlit.stac import create_and_save_gif, fetch_stac_items_for_bbox, get_band_metadata
 from mapa_streamlit.utils import TMPDIR
 from streamlit_folium import st_folium
+import plotly.figure_factory as ff
 
 from mapa_streamlit.cleaning import run_cleanup_job
 from mapa_streamlit.settings import (
@@ -96,7 +95,6 @@ def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar
     else:
         _compute_tif(geometry, progress_bar,user_defined_collection, user_defined_bands)
 
-
 def _compute_gif(folium_output: dict, geo_hash: str):
     
     user_defined_collection=st.session_state.selected_collection
@@ -106,8 +104,14 @@ def _compute_gif(folium_output: dict, geo_hash: str):
         get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
     }
     geometry = all_drawings_dict[geo_hash]
-    cache_dir= TMPDIR()
-    create_and_save_gif(geometry,cache_dir,user_defined_collection,user_defined_bands)
+    path= TMPDIR()
+
+    # geo_hash = get_hash_of_geojson(geometry)
+    # mapa_cache_dir = TMPDIR()
+    # run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
+    # path = mapa_cache_dir / geo_hash
+
+    create_and_save_gif(geometry,user_defined_collection,user_defined_bands,path)
     #print("THIS PATH IN COMPUTE_PATH,", path)
     #return path
     st.sidebar.success("Successfully zipped gif file!")
@@ -120,27 +124,17 @@ def _download_tifs_btn(data: str, disabled: bool) -> None:
         disabled=disabled,
     )
 
-def _download_gifs_btn(data: str, disabled: bool) -> None:
+def _download_gifs_btn(gif_bytes: str, disabled: bool) -> None:
     st.sidebar.download_button(
             label=BTN_LABEL_DOWNLOAD_GIFS,
             #key="make_gif",
-            data=data,
+            data=gif_bytes,
+            file_name="gif.zip",
             on_click=_compute_gif,
+            mime="application/zip",
             kwargs={"folium_output": output, "geo_hash": geo_hash},
             disabled=False if geo_hash else True,
         )
-    
-# def display_gif():
-#     """### gif from local file"""
-#     file_ = open("/home/rzwitch/Desktop/giphy.gif", "rb")
-#     contents = file_.read()
-#     data_url = base64.b64encode(contents).decode("utf-8")
-#     file_.close()
-
-#     st.markdown(
-#         f'<img src="data:image/gif;base64,{data_url}" alt="cat gif">',
-#         unsafe_allow_html=True,
-#     )
         
 
 def _get_active_drawing_hash(state, drawings: List[str]) -> str:
@@ -169,6 +163,54 @@ collection_data = {
 }
 
 
+def create_table():
+    user_defined_collection=st.session_state.selected_collection
+    user_defined_bands=st.session_state.selected_bands
+    folium_output=output
+
+    all_drawings_dict = {
+        get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
+    }
+    geometry = all_drawings_dict[geo_hash]
+    
+    _,array=fetch_stac_items_for_bbox(user_defined_bands,
+    user_defined_collection,
+    geometry,
+    allow_caching=True,
+    cache_dir=TMPDIR(),
+    progress_bar=None)
+
+    print(array)
+    print(array.shape)
+
+#    data_hist=array
+
+#    group_labels = ['Group 1', 'Group 2','Group 3']
+
+#    fig = ff.create_distplot(
+#            data_hist, group_labels,bin_size=[.1, .25, .5])
+
+    #st.plotly_chart(fig, use_container_width=True)
+
+    # st.data_editor(
+    # data_df,
+    # column_config={
+    #     "sales": st.column_config.LineChartColumn(
+    #         "Sales (last 6 months)",
+    #         width="medium",
+    #         help="The sales volume in the last 6 months",
+    #         y_min=0,
+    #         y_max=100,
+    #      ),
+    # },
+    # hide_index=True,
+#)
+
+
+def trigger_functions(folium_output, geo_hash, progress_bar):
+    _check_area_and_compute_tif(folium_output, geo_hash, progress_bar)
+    create_table()
+
 if __name__ == "__main__":
     st.set_page_config(
         page_title="mapa",
@@ -189,16 +231,21 @@ if __name__ == "__main__":
     m = _show_map(center=MAP_CENTER, zoom=MAP_ZOOM)
     output = st_folium(m, key="init", width=1000, height=600)
 
+
     geo_hash = None
     if output:
         if output["all_drawings"] is not None:
             # get latest modified drawing
             all_drawings = [get_hash_of_geojson(draw["geometry"]) for draw in output["all_drawings"]]
             geo_hash = _get_active_drawing_hash(state=st.session_state, drawings=all_drawings)
-
+    st.write("\n")
     # ensure progress bar resides at top of sidebar and is invisible initially
     progress_bar = st.sidebar.progress(0)
     progress_bar.empty()
+
+
+
+
 
 
     # Getting Started container
@@ -227,10 +274,14 @@ if __name__ == "__main__":
         st.button(
             BTN_LABEL_CREATE_TIF,
             key="find_tifs",
-            on_click=_check_area_and_compute_tif,
-            kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar},
+            on_click=lambda: trigger_functions(output, geo_hash, progress_bar),
+            #on_click=_check_area_and_compute_tif, 
+            #kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar},
             disabled=False if geo_hash else True,
         )
+
+                
+
         st.markdown(
             f"""
             5. Wait for the computation to finish
@@ -248,57 +299,18 @@ if __name__ == "__main__":
         else:
             _download_tifs_btn(b"None", True)
 
-        #if geo_hash is None: 
-        #    pass
-        #else:
+     
             
-        #output_gif_file = TMPDIR() / f"{geo_hash}.zip"   
+        
         output_gifs_file = TMPDIR() / "gif.zip"
         if output_gifs_file.is_file():
             with open(output_gifs_file, "rb") as fp:
                 gif_bytes = fp.read()
-                st.sidebar.download_button(
-            label=BTN_LABEL_DOWNLOAD_GIFS,
-            #key="make_gif",
-            data=gif_bytes,
-            file_name="gif.zip",
-            on_click=_compute_gif,
-            mime="application/zip",
-            kwargs={"folium_output": output, "geo_hash": geo_hash},
-            disabled=False if geo_hash else True,
-        )
                 
-            #     st.sidebar.download_button(
-            # label=BTN_LABEL_DOWNLOAD_GIFS,
-            # #key="make_gif",
-            # #data=data,
-            # on_click=_compute_gif,
-            # kwargs={"folium_output": output, "geo_hash": geo_hash},
-            # disabled=False if geo_hash else True,
-        # )
+                _download_gifs_btn(gif_bytes,False)
                 
-   
-
-
-        # output_gif_file = TMPDIR() / f"{geo_hash}.zip"
-        # if output_gif_file.is_file():
-        #     # gif_bytes=_compute_gif(output, geo_hash)
-        #     # with open(output_gif_file, "wb") as f:
-        #     #     f.write(gif_bytes)
-            
-        #     with open(output_gif_file, "rb") as fp:
-        #         _download_gifs_btn(fp, False)
-        # else:
-        #     _download_gifs_btn(b"None", True)
-            
-
-
-
-
-
-
-     
-
+        else:
+            _download_gifs_btn(b"None", True)
 
 
         st.sidebar.markdown("---")
@@ -325,5 +337,7 @@ if __name__ == "__main__":
             options=TilingSelect.options,
             help=TilingSelect.help,
         )
+
+ 
 
         

@@ -2,7 +2,7 @@ import logging
 import warnings
 from pydantic import PydanticDeprecatedSince20
 from pathlib import Path
-from typing import List, Union
+from typing import Any, List, Tuple, Union
 from urllib import request
 from odc.stac import stac_load
 import rasterio as rio
@@ -19,6 +19,8 @@ from pystac_client import Client
 import stackstac
 
 from mapa_streamlit import conf
+from mapa_streamlit.caching import get_hash_of_geojson
+from mapa_streamlit.cleaning import _delete_files_in_dir, run_cleanup_job
 from mapa_streamlit.exceptions import NoSTACItemFound
 from mapa_streamlit.utils import TMPDIR, ProgressBar
 import pystac_client
@@ -62,10 +64,10 @@ def save_images_from_xarr(xarray, filepath, bands:list, collection:str, datatype
         "nodata": 0, 
     }
 
-    rgb_array = np.stack([xarray[b].values for b in bands], axis=-1)
+    array = np.stack([xarray[b].values for b in bands], axis=-1)
     key = {i: bands[i] for i in range(len(bands))}
 
-    for i, arr in enumerate(rgb_array):
+    for i, arr in enumerate(array):
         filename=Path(collection+"_"
             + pd.to_datetime(xarray[bands[0]].time.values[i])
             .to_pydatetime()
@@ -81,13 +83,13 @@ def save_images_from_xarr(xarray, filepath, bands:list, collection:str, datatype
                 dst.set_band_description(j+1,key[j])   
 
                 paths.append(filepath/filename)
-    return paths
+    return paths,array
 
 
 
 def fetch_stac_items_for_bbox(
     user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, progress_bar: Union[None, ProgressBar] = None
-) -> List[Path]:
+) -> Tuple:
     
     items = search_stac_for_items(user_defined_collection, geojson)
 
@@ -113,12 +115,12 @@ def fetch_stac_items_for_bbox(
     if n > 0:
         log.info(f"⬇️  fetching {n} stac items...")
         
-        files=save_images_from_xarr(xx,cache_dir,user_defined_bands,user_defined_collection)
+        files,array=save_images_from_xarr(xx,cache_dir,user_defined_bands,user_defined_collection)
         
         if progress_bar:
             progress_bar.step()
         print("######",files)
-        return files
+        return files, array
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box.")
 
@@ -172,14 +174,14 @@ def filter(bands,resolution,items,bbox,perc_thresh):
     ts = nodata_filtered.persist()
     return ts
 
-def save_gif(filepath,gif):
+def save_gif(gif):
     filename=Path("my_gif.gif")
     with open(filename, "wb") as f:
         f.write(gif)
     path=filename
     return path
 
-def create_and_save_gif(geojson,cache_dir,user_defined_collection,user_defined_bands,compress=True)->Path:
+def create_and_save_gif(geojson,user_defined_collection,user_defined_bands,output_file,compress=True)->Path:
     gif_path_list=[]
     items=search_stac_for_items(user_defined_collection, geojson)
     print("#########################items!:",items)
@@ -190,9 +192,14 @@ def create_and_save_gif(geojson,cache_dir,user_defined_collection,user_defined_b
     ts=filter(user_defined_bands,10,items,bbox,perc_thresh=95) #check with band that is 30m if this 10m would work
     print(ts)
     gif=dgif(ts,fps=0.5,cmap="Greys",date_color=(0, 0, 0), date_bg=None, date_position="lr", date_format="%Y-%m-%d_%H:%M:%S", bytes=True).compute()
-    path=save_gif(cache_dir,gif)
+    path=save_gif(gif)
     gif_path_list.append(path)
     print(path)
+    print(output_file)
+    # mapa_cache_dir = TMPDIR()
+    # run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=60)
+    # path = mapa_cache_dir / geo_hash
+    #_delete_files_in_dir(TMPDIR(), ".zip")
     output_file=TMPDIR()/"gif.zip"
     if compress:
         return create_gif_zip_archive(files=gif_path_list, output_file=output_file)

@@ -130,4 +130,6 @@ dmypy.json
 
 spike/
 *.stl
+*.gif
+*.zip
 todo.md
