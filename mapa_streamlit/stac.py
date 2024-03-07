@@ -120,7 +120,7 @@ def fetch_stac_items_for_bbox(
         if progress_bar:
             progress_bar.step()
         print("######",files)
-        return files, array
+        return files, xx
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box.")
 

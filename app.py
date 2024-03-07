@@ -4,6 +4,7 @@ import os
 from typing import List
 
 import folium
+import numpy as np
 import pandas as pd
 import streamlit as st
 from folium.plugins import Draw
@@ -12,7 +13,8 @@ from mapa_streamlit.caching import get_hash_of_geojson
 from mapa_streamlit.stac import create_and_save_gif, fetch_stac_items_for_bbox, get_band_metadata
 from mapa_streamlit.utils import TMPDIR
 from streamlit_folium import st_folium
-import plotly.figure_factory as ff
+import plotly.graph_objects as go
+
 
 from mapa_streamlit.cleaning import run_cleanup_job
 from mapa_streamlit.settings import (
@@ -173,38 +175,34 @@ def create_table():
     }
     geometry = all_drawings_dict[geo_hash]
     
-    _,array=fetch_stac_items_for_bbox(user_defined_bands,
+    _,xx=fetch_stac_items_for_bbox(user_defined_bands,
     user_defined_collection,
     geometry,
     allow_caching=True,
     cache_dir=TMPDIR(),
     progress_bar=None)
 
-    print(array)
-    print(array.shape)
+    # Assuming data_array is your numpy array with shape (1, 4, 134, 141)
+    data_array = xx.to_array().to_numpy()
+    data_array = np.expand_dims(data_array, axis=0)
 
-#    data_hist=array
+    # Extract data for each distribution
+    data_distributions = data_array.squeeze(axis=0)  # Remove the singleton dimension
 
-#    group_labels = ['Group 1', 'Group 2','Group 3']
+    # Create histogram traces for each distribution
+    histogram_traces = []
+    for i, distribution_data in enumerate(data_distributions):
+        histogram_trace = go.Histogram(x=distribution_data.flatten(), name=f'Distribution {i+1}', histnorm='probability')
+        histogram_traces.append(histogram_trace)
 
-#    fig = ff.create_distplot(
-#            data_hist, group_labels,bin_size=[.1, .25, .5])
+    # Create layout for the plot
+    layout = go.Layout(title='Pixel Value Distribution Plot', xaxis=dict(title='Value'), yaxis=dict(title='Probability'))
 
-    #st.plotly_chart(fig, use_container_width=True)
+    # Create the figure
+    fig = go.Figure(data=histogram_traces, layout=layout)
 
-    # st.data_editor(
-    # data_df,
-    # column_config={
-    #     "sales": st.column_config.LineChartColumn(
-    #         "Sales (last 6 months)",
-    #         width="medium",
-    #         help="The sales volume in the last 6 months",
-    #         y_min=0,
-    #         y_max=100,
-    #      ),
-    # },
-    # hide_index=True,
-#)
+    # Show the plot
+    fig.show()
 
 
 def trigger_functions(folium_output, geo_hash, progress_bar):
