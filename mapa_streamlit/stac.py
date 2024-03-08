@@ -115,12 +115,12 @@ def fetch_stac_items_for_bbox(
     if n > 0:
         log.info(f"⬇️  fetching {n} stac items...")
         
-        files,array=save_images_from_xarr(xx,cache_dir,user_defined_bands,user_defined_collection)
+        paths,array=save_images_from_xarr(xx,cache_dir,user_defined_bands,user_defined_collection)
         
         if progress_bar:
             progress_bar.step()
-        print("######",files)
-        return files, xx
+        print("######",paths)
+        return paths, array, xx
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box.")
 

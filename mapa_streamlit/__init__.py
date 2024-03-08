@@ -90,7 +90,7 @@ def convert_bbox_to_tif(
         steps = tiles.x * tiles.y * 2 if compress else tiles.x * tiles.y
         progress_bar = ProgressBar(progress_bar=progress_bar, steps=steps)
 
-    list_paths_to_tiffs,xx=fetch_stac_items_for_bbox(user_defined_bands,
+    list_paths_to_tiffs,arr,xx=fetch_stac_items_for_bbox(user_defined_bands,
     user_defined_collection,
     bbox_geometry,
     allow_caching,

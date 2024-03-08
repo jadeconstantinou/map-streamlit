@@ -4,6 +4,7 @@ import os
 from typing import List
 
 import folium
+from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -114,8 +115,7 @@ def _compute_gif(folium_output: dict, geo_hash: str):
     # path = mapa_cache_dir / geo_hash
 
     create_and_save_gif(geometry,user_defined_collection,user_defined_bands,path)
-    #print("THIS PATH IN COMPUTE_PATH,", path)
-    #return path
+    
     st.sidebar.success("Successfully zipped gif file!")
 
 def _download_tifs_btn(data: str, disabled: bool) -> None:
@@ -165,49 +165,49 @@ collection_data = {
 }
 
 
-def create_table():
-    user_defined_collection=st.session_state.selected_collection
-    user_defined_bands=st.session_state.selected_bands
-    folium_output=output
 
-    all_drawings_dict = {
-        get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
-    }
-    geometry = all_drawings_dict[geo_hash]
-    
-    _,xx=fetch_stac_items_for_bbox(user_defined_bands,
-    user_defined_collection,
-    geometry,
-    allow_caching=True,
-    cache_dir=TMPDIR(),
-    progress_bar=None)
+def create_histogram(paths, array, tif_selectbox, selected_bands):
+    if len(selected_bands)==1:
+        print(array.shape)
+        print("name: ", tif_selectbox)
+        filenames = [path.name for path in paths]
+        data_distributions = array.squeeze(axis=-1)  # Remove the singleton dimension
+        histogram_traces = []
+        for filename, distribution_data in zip(filenames, data_distributions):
+            if filename == tif_selectbox:
+                histogram_trace = go.Histogram(x=distribution_data.flatten(), name=filename, histnorm='probability')
+                histogram_traces.append(histogram_trace)
+        if histogram_traces:  # Check if any histogram traces were created
+            layout = go.Layout(title='Pixel Value Distribution Plot', xaxis=dict(title='Pixel Value'), yaxis=dict(title='Frequency'))
+            fig = go.Figure(data=histogram_traces, layout=layout)
+            st.plotly_chart(fig)
+        else:
+            st.write(f"No histogram data found for '{tif_selectbox}'.")
+        
+    if len(selected_bands)>1:
+            print("name: ", tif_selectbox)
+            filenames = [path.name for path in paths]
+            filenames = list(dict.fromkeys(filenames))
+            histogram_traces = []
+            for filename, distribution_data in zip(filenames, array):
+                if filename == tif_selectbox:
+                    for i in range(len(selected_bands)):
+                        # Extract each array for a single distribution
+                        distribution_array = distribution_data[i]
+                        histogram_trace = go.Histogram(x=distribution_array.flatten(), name=f'{filename} - {selected_bands[i]}', histnorm='probability')
+                        histogram_traces.append(histogram_trace)
+            if histogram_traces:  # Check if any histogram traces were created
+                layout = go.Layout(title='Pixel Value Distribution Plot', xaxis=dict(title='Pixel Value'), yaxis=dict(title='Frequency'))
+                fig = go.Figure(data=histogram_traces, layout=layout)
+                st.plotly_chart(fig)
+            else:
+                st.write(f"No histogram data found for '{tif_selectbox}'.")
+        
 
-    # Assuming data_array is your numpy array with shape (1, 4, 134, 141)
-    data_array = xx.to_array().to_numpy()
-    data_array = np.expand_dims(data_array, axis=0)
 
-    # Extract data for each distribution
-    data_distributions = data_array.squeeze(axis=0)  # Remove the singleton dimension
-
-    # Create histogram traces for each distribution
-    histogram_traces = []
-    for i, distribution_data in enumerate(data_distributions):
-        histogram_trace = go.Histogram(x=distribution_data.flatten(), name=f'Distribution {i+1}', histnorm='probability')
-        histogram_traces.append(histogram_trace)
-
-    # Create layout for the plot
-    layout = go.Layout(title='Pixel Value Distribution Plot', xaxis=dict(title='Value'), yaxis=dict(title='Probability'))
-
-    # Create the figure
-    fig = go.Figure(data=histogram_traces, layout=layout)
-
-    # Show the plot
-    fig.show()
-
-
-def trigger_functions(folium_output, geo_hash, progress_bar):
-    _check_area_and_compute_tif(folium_output, geo_hash, progress_bar)
-    create_table()
+# def trigger_functions(folium_output, geo_hash, progress_bar):
+#     _check_area_and_compute_tif(folium_output, geo_hash, progress_bar)
+#     create_histogram()
 
 if __name__ == "__main__":
     st.set_page_config(
@@ -269,14 +269,16 @@ if __name__ == "__main__":
             """,
             unsafe_allow_html=True,
         )
-        st.button(
+        find_tifs_button=st.button(
             BTN_LABEL_CREATE_TIF,
-            key="find_tifs",
-            on_click=lambda: trigger_functions(output, geo_hash, progress_bar),
-            #on_click=_check_area_and_compute_tif, 
-            #kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar},
+            key="find_tifs_button",
+            #on_click=lambda: trigger_functions(output, geo_hash, progress_bar),
+            on_click=_check_area_and_compute_tif, 
+            kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar},
             disabled=False if geo_hash else True,
         )
+
+        
 
                 
 
@@ -335,7 +337,96 @@ if __name__ == "__main__":
             options=TilingSelect.options,
             help=TilingSelect.help,
         )
+  
+  #Outside of the sidebar  
 
- 
 
+    if 'tif_button_clicked' not in st.session_state:
+        st.session_state.tif_button_clicked = False
+
+    if find_tifs_button:
+        st.session_state.tif_button_clicked = True
+
+    if st.session_state.tif_button_clicked:
+        st.markdown(
+        """
+        # Requested tif information
+        Please use the dropdown box to investigate your queried data.
+        """,
+        unsafe_allow_html=True,
+    )
         
+        user_defined_collection = st.session_state.selected_collection
+        user_defined_bands = st.session_state.selected_bands
+        folium_output = output
+        all_drawings_dict = {
+            get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
+        }
+        geometry = all_drawings_dict[geo_hash]
+
+        paths, array,xx = fetch_stac_items_for_bbox(
+            user_defined_bands,
+            user_defined_collection,
+            geometry,
+            allow_caching=True,
+            cache_dir=TMPDIR(),
+            progress_bar=None
+        )
+
+        filenames = [path.name for path in paths]
+        filenames = list(dict.fromkeys(filenames))
+        tif_selectbox = st.selectbox("Choose an option", filenames)
+        if tif_selectbox:
+            st.write(f"You have chosen: {tif_selectbox}")
+            create_histogram(paths,array,tif_selectbox,user_defined_bands)
+            
+            if len(user_defined_bands)==1:
+                bands_str = ", ".join(map(str, user_defined_bands))
+                for arr in xx[bands_str]:
+                    fig, ax = plt.subplots()
+                    date_time=pd.to_datetime(arr.time.values).to_pydatetime().strftime("%Y-%m-%d_%H-%M-%S")+".tif"
+                    if date_time in tif_selectbox:
+                        ax.set_title(date_time)
+                        im = ax.imshow(arr)
+                        plt.colorbar(im)
+                        st.pyplot(fig)
+            
+            if len(user_defined_bands)>1: 
+                st.write(f"Please open this image in qgis '{tif_selectbox}'.")
+
+                # print(user_defined_bands)
+                # #for band in user_defined_bands:
+               
+                # band_values_list = [xx[band].values for band in user_defined_bands]
+                # print(len(band_values_list))
+                # # Stack the bands along the last dimension to create an RGB image
+                # rgb_image = np.stack(band_values_list, axis=-1)
+                # print(rgb_image.shape)
+                # arr_normalized = rgb_image / 10000
+                # from PIL import Image
+                # image = Image.fromarray((rgb_image * 255).astype(np.uint8))
+
+
+                # st.image(image, caption='RGB Image', use_column_width=True)
+
+            else:   
+                st.write(f"No image data found for '{tif_selectbox}'.")
+
+                
+                # stacked_array = np.stack(band_arrays, axis=-1)
+                # # Normalize each band to the range [0, 1]
+                # stacked_array = stacked_array.astype(np.float32)
+                # stacked_array /= np.max(stacked_array)
+
+                # # Create an RGB image by assigning each band to a color channel
+                # rgb_image = np.dstack((stacked_array[:, :, 0], stacked_array[:, :, 1], np.zeros_like(stacked_array[:, :, 0])))
+
+                # # Plot the RGB image
+                # fig, ax = plt.subplots()
+                # ax.imshow(rgb_image)
+                # ax.set_title("Combined Bands")
+                # st.pyplot(fig)
+
+               # plt.show()
+
+                
