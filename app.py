@@ -60,7 +60,7 @@ def _show_map(center: List[float], zoom: int) -> folium.Map:
     return m
 
 
-def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collection,user_defined_bands) -> None:
+def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collection,user_defined_bands,date_range) -> None:
     geo_hash = get_hash_of_geojson(geometry)
     mapa_cache_dir = TMPDIR()
     run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
@@ -72,13 +72,14 @@ def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collecti
         bbox_geometry=geometry,
         output_file=path,
         progress_bar=progress_bar,
+        date_range=date_range,
         split_area_in_tiles=DEFAULT_TILING_FORMAT if tiling_option is None else tiling_option,
     )
     # it is important to spawn this success message in the sidebar, because state will get lost otherwise
     st.sidebar.success("Successfully requested tif file!")
 
 
-def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar: st.progress) -> None:
+def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar: st.progress,date_range:str) -> None:
     user_defined_collection=st.session_state.selected_collection
     user_defined_bands=st.session_state.selected_bands
     all_drawings_dict = {
@@ -96,7 +97,7 @@ def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar
             "right. Ensure to use the initial center view of the world for drawing your rectangle."
         )
     else:
-        _compute_tif(geometry, progress_bar,user_defined_collection, user_defined_bands)
+        _compute_tif(geometry, progress_bar,user_defined_collection, user_defined_bands,date_range)
 
 def _compute_gif(folium_output: dict, geo_hash: str):
     
@@ -248,6 +249,30 @@ if __name__ == "__main__":
 
     # Getting Started container
     with st.sidebar.container():
+
+
+        today = datetime.datetime.now()
+        this_year = today.year
+
+        jan_1 = datetime.date(this_year, 1, 1)
+        dec_31 = datetime.date(this_year, 12, 31)
+
+        five_years_ago = this_year - 5
+        five_years_ago_jan_1 = datetime.date(five_years_ago, 1, 1)
+        three_years_ago_dec_31 = datetime.date(five_years_ago, 12, 31)
+
+        d = st.date_input(
+            "Select your time range",
+            (five_years_ago_jan_1, jan_1),  
+            five_years_ago_jan_1,  
+            jan_1,  
+            format="MM.DD.YYYY",
+        )
+        
+        date_range=str('/'.join(map(str, d)))
+        print(date_range)
+
+
         if 'selected_collection' not in st.session_state:
             st.session_state.selected_collection = st.selectbox('Select a collection', (collection_data.keys()))
         if 'selected_bands' not in st.session_state:
@@ -269,12 +294,18 @@ if __name__ == "__main__":
             """,
             unsafe_allow_html=True,
         )
+
+        
+        
+
+
+
         find_tifs_button=st.button(
             BTN_LABEL_CREATE_TIF,
             key="find_tifs_button",
             #on_click=lambda: trigger_functions(output, geo_hash, progress_bar),
             on_click=_check_area_and_compute_tif, 
-            kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar},
+            kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar, "date_range":date_range},
             disabled=False if geo_hash else True,
         )
 
@@ -370,6 +401,7 @@ if __name__ == "__main__":
             geometry,
             allow_caching=True,
             cache_dir=TMPDIR(),
+            date_range=date_range,
             progress_bar=None
         )
 

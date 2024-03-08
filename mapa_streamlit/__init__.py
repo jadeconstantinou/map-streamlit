@@ -30,6 +30,7 @@ def convert_bbox_to_tif(
     user_defined_collection:str,
     user_defined_bands:list,
     bbox_geometry: dict,
+    date_range:str,
     output_file: str = "output",
     split_area_in_tiles: str = "1x1",
     compress: bool = True,
@@ -95,6 +96,7 @@ def convert_bbox_to_tif(
     bbox_geometry,
     allow_caching,
     cache_dir,
+    date_range,
     progress_bar)    
     print("######################",list_paths_to_tiffs)
 

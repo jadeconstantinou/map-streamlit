@@ -88,10 +88,10 @@ def save_images_from_xarr(xarray, filepath, bands:list, collection:str, datatype
 
 
 def fetch_stac_items_for_bbox(
-    user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, progress_bar: Union[None, ProgressBar] = None
+    user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, date_range:str,progress_bar: Union[None, ProgressBar] = None, 
 ) -> Tuple:
     
-    items = search_stac_for_items(user_defined_collection, geojson)
+    items = search_stac_for_items(user_defined_collection, geojson,date_range)
 
     patch_url = None
     if are_stac_items_planetary_computer(items):
@@ -124,7 +124,7 @@ def fetch_stac_items_for_bbox(
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box.")
 
-def search_stac_for_items(user_defined_collection, geojson):
+def search_stac_for_items(user_defined_collection, geojson,date_range):
     bbox = _turn_geojson_into_bbox(geojson)
     
     catalog = pystac_client.Client.open(
@@ -135,7 +135,7 @@ def search_stac_for_items(user_defined_collection, geojson):
     search = catalog.search(
         collections=[user_defined_collection],  # landsat-c2-l2, sentinel-2-l2a
         bbox=bbox,
-        datetime="2023-10-20/2023-10-28",
+        datetime=date_range,
         query={
             "eo:cloud_cover": {"lt": 20},
         },
@@ -181,9 +181,9 @@ def save_gif(gif):
     path=filename
     return path
 
-def create_and_save_gif(geojson,user_defined_collection,user_defined_bands,output_file,compress=True)->Path:
+def create_and_save_gif(geojson,user_defined_collection,user_defined_bands,output_file,date_range,compress=True)->Path:
     gif_path_list=[]
-    items=search_stac_for_items(user_defined_collection, geojson)
+    items=search_stac_for_items(user_defined_collection, geojson,date_range)
     print("#########################items!:",items)
     print(len(items))
     bbox = _turn_geojson_into_bbox(geojson)
