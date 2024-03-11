@@ -8,7 +8,6 @@ MAP_ZOOM = 3
 
 BTN_LABEL_CREATE_TIF = "Click to request data"
 BTN_LABEL_DOWNLOAD_TIFS = "Click to download .tifs"
-#BTN_LABEL_CREATE_GIF="Click to create gif"
 BTN_LABEL_DOWNLOAD_GIFS = "Click to download gif"
 
 MAX_ALLOWED_AREA_SIZE = 25.0

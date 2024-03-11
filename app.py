@@ -73,7 +73,7 @@ def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collecti
         output_file=path,
         progress_bar=progress_bar,
         date_range=date_range,
-        split_area_in_tiles=DEFAULT_TILING_FORMAT if tiling_option is None else tiling_option,
+        split_area_in_tiles= "1x1",
     )
     # it is important to spawn this success message in the sidebar, because state will get lost otherwise
     st.sidebar.success("Successfully requested tif file!")
@@ -99,7 +99,7 @@ def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar
     else:
         _compute_tif(geometry, progress_bar,user_defined_collection, user_defined_bands,date_range)
 
-def _compute_gif(folium_output: dict, geo_hash: str):
+def _compute_gif(folium_output: dict, geo_hash: str,date_range:str):
     
     user_defined_collection=st.session_state.selected_collection
     user_defined_bands=st.session_state.selected_bands
@@ -115,7 +115,7 @@ def _compute_gif(folium_output: dict, geo_hash: str):
     # run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
     # path = mapa_cache_dir / geo_hash
 
-    create_and_save_gif(geometry,user_defined_collection,user_defined_bands,path)
+    create_and_save_gif(geometry,user_defined_collection,user_defined_bands,path,date_range)
     
     st.sidebar.success("Successfully zipped gif file!")
 
@@ -135,7 +135,7 @@ def _download_gifs_btn(gif_bytes: str, disabled: bool) -> None:
             file_name="gif.zip",
             on_click=_compute_gif,
             mime="application/zip",
-            kwargs={"folium_output": output, "geo_hash": geo_hash},
+            kwargs={"folium_output": output, "geo_hash": geo_hash, "date_range":date_range},
             disabled=False if geo_hash else True,
         )
         
@@ -254,19 +254,19 @@ if __name__ == "__main__":
         today = datetime.datetime.now()
         this_year = today.year
 
-        jan_1 = datetime.date(this_year, 1, 1)
-        dec_31 = datetime.date(this_year, 12, 31)
+        #jan_1 = datetime.date(this_year, 1, 1)
+        #dec_31 = datetime.date(this_year, 12, 31)
 
         five_years_ago = this_year - 5
         five_years_ago_jan_1 = datetime.date(five_years_ago, 1, 1)
-        three_years_ago_dec_31 = datetime.date(five_years_ago, 12, 31)
+        #five_years_ago_dec_31 = datetime.date(five_years_ago, 12, 31)
 
         d = st.date_input(
             "Select your time range",
-            (five_years_ago_jan_1, jan_1),  
+            (five_years_ago_jan_1, today),  
             five_years_ago_jan_1,  
-            jan_1,  
-            format="MM.DD.YYYY",
+            today,  
+            format="DD.MM.YYYY",
         )
         
         date_range=str('/'.join(map(str, d)))
@@ -363,11 +363,11 @@ if __name__ == "__main__":
             selected_collection= st.table(get_band_metadata(selected_collection))
            
 
-        tiling_option = st.selectbox(
-            label=TilingSelect.label,
-            options=TilingSelect.options,
-            help=TilingSelect.help,
-        )
+        # tiling_option = st.selectbox(
+        #     label=TilingSelect.label,
+        #     options=TilingSelect.options,
+        #     help=TilingSelect.help,
+        # )
   
   #Outside of the sidebar  
 
@@ -422,43 +422,36 @@ if __name__ == "__main__":
                         im = ax.imshow(arr)
                         plt.colorbar(im)
                         st.pyplot(fig)
-            
-            if len(user_defined_bands)>1: 
-                st.write(f"Please open this image in qgis '{tif_selectbox}'.")
-
-                # print(user_defined_bands)
-                # #for band in user_defined_bands:
+        
+                        
+            if len(user_defined_bands) > 1:
+                print(user_defined_bands)
                
-                # band_values_list = [xx[band].values for band in user_defined_bands]
-                # print(len(band_values_list))
-                # # Stack the bands along the last dimension to create an RGB image
-                # rgb_image = np.stack(band_values_list, axis=-1)
-                # print(rgb_image.shape)
-                # arr_normalized = rgb_image / 10000
-                # from PIL import Image
-                # image = Image.fromarray((rgb_image * 255).astype(np.uint8))
-
-
-                # st.image(image, caption='RGB Image', use_column_width=True)
-
-            else:   
-                st.write(f"No image data found for '{tif_selectbox}'.")
+                
+                if user_defined_bands==['B02', 'B03', 'B04']:
+                    user_defined_bands.reverse()
+                    band_values_list = [xx[band].values for band in user_defined_bands]
+                else:
+                    band_values_list = [xx[band].values for band in user_defined_bands]
 
                 
-                # stacked_array = np.stack(band_arrays, axis=-1)
-                # # Normalize each band to the range [0, 1]
-                # stacked_array = stacked_array.astype(np.float32)
-                # stacked_array /= np.max(stacked_array)
+                stacked_image = np.stack(band_values_list, axis=-1)
+                arr_normalized = stacked_image / 10000
+                datetimes = pd.to_datetime(xx.time.values.astype('datetime64[s]')).strftime("%Y-%m-%d_%H-%M-%S")
 
-                # # Create an RGB image by assigning each band to a color channel
-                # rgb_image = np.dstack((stacked_array[:, :, 0], stacked_array[:, :, 1], np.zeros_like(stacked_array[:, :, 0])))
+                for i, date_time in enumerate(datetimes):
+                    if date_time in tif_selectbox:
+                        fig, ax = plt.subplots()
+                        ax.imshow(arr_normalized[i])
+                        ax.set_title(f"{date_time}")
+                        st.pyplot(fig)
 
-                # # Plot the RGB image
-                # fig, ax = plt.subplots()
-                # ax.imshow(rgb_image)
-                # ax.set_title("Combined Bands")
-                # st.pyplot(fig)
+               
 
-               # plt.show()
+            #else:   
+            #    st.write(f"No image data found for '{tif_selectbox}'.")
+
+                
+                
 
                 
