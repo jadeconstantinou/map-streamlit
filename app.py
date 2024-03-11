@@ -434,8 +434,15 @@ if __name__ == "__main__":
                 else:
                     band_values_list = [xx[band].values for band in user_defined_bands]
 
+                if len(user_defined_bands) == 2:
+                    empty_band = np.empty_like(band_values_list[0])
+                    empty_band.fill(np.nan)
+                    stacked_image = np.stack(band_values_list + [empty_band], axis=-1)
+
+                if len(user_defined_bands)==3:
+                    stacked_image = np.stack(band_values_list, axis=-1)
                 
-                stacked_image = np.stack(band_values_list, axis=-1)
+                
                 arr_normalized = stacked_image / 10000
                 datetimes = pd.to_datetime(xx.time.values.astype('datetime64[s]')).strftime("%Y-%m-%d_%H-%M-%S")
 
