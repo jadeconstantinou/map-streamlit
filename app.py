@@ -210,6 +210,77 @@ def create_histogram(paths, array, tif_selectbox, selected_bands):
 #     _check_area_and_compute_tif(folium_output, geo_hash, progress_bar)
 #     create_histogram()
 
+def plot_images(create_histogram, geo_hash, date_range,folium_output,user_defined_collection ,user_defined_bands):
+
+
+    all_drawings_dict = {
+            get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
+        }
+    geometry = all_drawings_dict[geo_hash]
+
+    paths, array,xx = fetch_stac_items_for_bbox(
+            user_defined_bands,
+            user_defined_collection,
+            geometry,
+            allow_caching=True,
+            cache_dir=TMPDIR(),
+            date_range=date_range,
+            progress_bar=None
+        )
+
+    filenames = [path.name for path in paths]
+    filenames = list(dict.fromkeys(filenames))
+    tif_selectbox = st.selectbox("Choose an option", filenames)
+    if tif_selectbox:
+        st.write(f"You have chosen: {tif_selectbox}")
+        create_histogram(paths,array,tif_selectbox,user_defined_bands)
+            
+        if len(user_defined_bands)==1:
+            bands_str = ", ".join(map(str, user_defined_bands))
+            for arr in xx[bands_str]:
+                fig, ax = plt.subplots()
+                date_time=pd.to_datetime(arr.time.values).to_pydatetime().strftime("%Y-%m-%d_%H-%M-%S")+".tif"
+                if date_time in tif_selectbox:
+                    ax.set_title(date_time)
+                    im = ax.imshow(arr)
+                    plt.colorbar(im)
+                    st.pyplot(fig)
+        
+                        
+        if len(user_defined_bands) > 1:
+            print(user_defined_bands)
+               
+                
+            if user_defined_bands==['B02', 'B03', 'B04']:
+                user_defined_bands.reverse()
+                band_values_list = [xx[band].values for band in user_defined_bands]
+            else:
+                band_values_list = [xx[band].values for band in user_defined_bands]
+
+            if len(user_defined_bands) == 2:
+                empty_band = np.empty_like(band_values_list[0])
+                empty_band.fill(np.nan)
+                stacked_image = np.stack(band_values_list + [empty_band], axis=-1)
+
+            if len(user_defined_bands)==3:
+                stacked_image = np.stack(band_values_list, axis=-1)
+                
+                
+            arr_normalized = stacked_image / 10000
+            datetimes = pd.to_datetime(xx.time.values.astype('datetime64[s]')).strftime("%Y-%m-%d_%H-%M-%S")
+
+            for i, date_time in enumerate(datetimes):
+                if date_time in tif_selectbox:
+                    fig, ax = plt.subplots()
+                    ax.imshow(arr_normalized[i])
+                    ax.set_title(f"{date_time}")
+                    st.pyplot(fig)
+
+
+def toggle_instructions():
+    st.session_state.show_instructions = not st.session_state.show_instructions
+
+
 if __name__ == "__main__":
     st.set_page_config(
         page_title="mapa",
@@ -221,12 +292,33 @@ if __name__ == "__main__":
 
     st.markdown(
         """
-        # &nbsp; 🌍 &nbsp; Open data download app 
-        Follow the instructions in the sidebar on the left to create and download tifs.
+        #  Open Data Explorer
         """,
         unsafe_allow_html=True,
     )
     st.write("\n")
+    if 'show_instructions' not in st.session_state:
+        st.session_state.show_instructions = False
+
+    # Button to toggle instructions visibility
+    if st.button('Instructions'):
+        toggle_instructions()
+
+    # Instructions section
+    if st.session_state.show_instructions:
+        st.markdown(
+            f"""
+             1. Zoom to your region of interest on the map &nbsp; 🌍 &nbsp;
+             2. Click the black square on the map to draw a polygon
+             3. Select date range, collection and up to 3 bands in the sidebar dropdown menus. If you need more information about the bands, scroll down on the sidebar to find a band metadata table
+             3. Click on <kbd>{BTN_LABEL_CREATE_TIF}</kbd>
+             4. Wait for the computation to finish
+             5. Below the map, view the 'Requested tif information' to view images and their pixel value distribution
+             5. Click on <kbd>{BTN_LABEL_DOWNLOAD_TIFS}</kbd> or <kbd>{BTN_LABEL_DOWNLOAD_GIFS}</kbd> 
+            
+             """,
+            unsafe_allow_html=True,)
+
     m = _show_map(center=MAP_CENTER, zoom=MAP_ZOOM)
     output = st_folium(m, key="init", width=1000, height=600)
 
@@ -282,18 +374,19 @@ if __name__ == "__main__":
             st.session_state.selected_collection =selected_collection
 
             if st.session_state.selected_collection != 'select':
-                st.session_state.selected_bands = st.multiselect('Select bands', collection_data[selected_collection])
+                selected_bands = st.multiselect('Select bands', collection_data[selected_collection])
+                st.session_state.selected_bands = selected_bands
 
-        st.markdown(
-            f"""
-            # Getting Started
-            1. Zoom to your region of interest
-            2. Click the black square on the map
-            3. Draw a rectangle on the map
-            4. Click on <kbd>{BTN_LABEL_CREATE_TIF}</kbd>
-            """,
-            unsafe_allow_html=True,
-        )
+        # st.markdown(
+        #     f"""
+        #     # Getting Started
+        #     1. Zoom to your region of interest
+        #     2. Click the black square on the map
+        #     3. Draw a rectangle on the map
+        #     4. Click on <kbd>{BTN_LABEL_CREATE_TIF}</kbd>
+        #     """,
+        #     unsafe_allow_html=True,
+        # )
 
         
         
@@ -313,14 +406,14 @@ if __name__ == "__main__":
 
                 
 
-        st.markdown(
-            f"""
-            5. Wait for the computation to finish
-            6. Click on <kbd>{BTN_LABEL_DOWNLOAD_TIFS}</kbd>
-            or <kbd>{BTN_LABEL_DOWNLOAD_GIFS}</kbd>
-            """,
-            unsafe_allow_html=True,
-        )
+        # st.markdown(
+        #     f"""
+        #     5. Wait for the computation to finish
+        #     6. Click on <kbd>{BTN_LABEL_DOWNLOAD_TIFS}</kbd>
+        #     or <kbd>{BTN_LABEL_DOWNLOAD_GIFS}</kbd>
+        #     """,
+        #     unsafe_allow_html=True,
+        # )
 
         
         output_tifs_file = TMPDIR() / f"{geo_hash}.zip"
@@ -387,71 +480,10 @@ if __name__ == "__main__":
         unsafe_allow_html=True,
     )
         
-        user_defined_collection = st.session_state.selected_collection
-        user_defined_bands = st.session_state.selected_bands
-        folium_output = output
-        all_drawings_dict = {
-            get_hash_of_geojson(draw["geometry"]): draw["geometry"] for draw in folium_output["all_drawings"]
-        }
-        geometry = all_drawings_dict[geo_hash]
+        plot_images(create_histogram, geo_hash, date_range,output,st.session_state.selected_collection, st.session_state.selected_bands)
 
-        paths, array,xx = fetch_stac_items_for_bbox(
-            user_defined_bands,
-            user_defined_collection,
-            geometry,
-            allow_caching=True,
-            cache_dir=TMPDIR(),
-            date_range=date_range,
-            progress_bar=None
-        )
-
-        filenames = [path.name for path in paths]
-        filenames = list(dict.fromkeys(filenames))
-        tif_selectbox = st.selectbox("Choose an option", filenames)
-        if tif_selectbox:
-            st.write(f"You have chosen: {tif_selectbox}")
-            create_histogram(paths,array,tif_selectbox,user_defined_bands)
-            
-            if len(user_defined_bands)==1:
-                bands_str = ", ".join(map(str, user_defined_bands))
-                for arr in xx[bands_str]:
-                    fig, ax = plt.subplots()
-                    date_time=pd.to_datetime(arr.time.values).to_pydatetime().strftime("%Y-%m-%d_%H-%M-%S")+".tif"
-                    if date_time in tif_selectbox:
-                        ax.set_title(date_time)
-                        im = ax.imshow(arr)
-                        plt.colorbar(im)
-                        st.pyplot(fig)
         
-                        
-            if len(user_defined_bands) > 1:
-                print(user_defined_bands)
-               
-                
-                if user_defined_bands==['B02', 'B03', 'B04']:
-                    user_defined_bands.reverse()
-                    band_values_list = [xx[band].values for band in user_defined_bands]
-                else:
-                    band_values_list = [xx[band].values for band in user_defined_bands]
-
-                if len(user_defined_bands) == 2:
-                    empty_band = np.empty_like(band_values_list[0])
-                    empty_band.fill(np.nan)
-                    stacked_image = np.stack(band_values_list + [empty_band], axis=-1)
-
-                if len(user_defined_bands)==3:
-                    stacked_image = np.stack(band_values_list, axis=-1)
-                
-                
-                arr_normalized = stacked_image / 10000
-                datetimes = pd.to_datetime(xx.time.values.astype('datetime64[s]')).strftime("%Y-%m-%d_%H-%M-%S")
-
-                for i, date_time in enumerate(datetimes):
-                    if date_time in tif_selectbox:
-                        fig, ax = plt.subplots()
-                        ax.imshow(arr_normalized[i])
-                        ax.set_title(f"{date_time}")
-                        st.pyplot(fig)
+        
 
                
 
