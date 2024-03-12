@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import time
 from typing import List
 
 import folium
@@ -12,7 +13,7 @@ from folium.plugins import Draw
 from mapa_streamlit import convert_bbox_to_tif
 from mapa_streamlit.caching import get_hash_of_geojson
 from mapa_streamlit.stac import create_and_save_gif, fetch_stac_items_for_bbox, get_band_metadata
-from mapa_streamlit.utils import TMPDIR
+from mapa_streamlit.utils import GIFTMPDIR, TMPDIR
 from streamlit_folium import st_folium
 import plotly.graph_objects as go
 
@@ -75,7 +76,6 @@ def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collecti
         date_range=date_range,
         split_area_in_tiles= "1x1",
     )
-    # it is important to spawn this success message in the sidebar, because state will get lost otherwise
     st.sidebar.success("Successfully requested tif file!")
 
 
@@ -110,12 +110,12 @@ def _compute_gif(folium_output: dict, geo_hash: str,date_range:str):
     geometry = all_drawings_dict[geo_hash]
     path= TMPDIR()
 
-    # geo_hash = get_hash_of_geojson(geometry)
-    # mapa_cache_dir = TMPDIR()
-    # run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
-    # path = mapa_cache_dir / geo_hash
+    geo_hash = get_hash_of_geojson(geometry)
+    mapa_cache_dir = GIFTMPDIR()
+    run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
+    path = mapa_cache_dir / geo_hash
 
-    create_and_save_gif(geometry,user_defined_collection,user_defined_bands,path,date_range)
+    create_and_save_gif(geometry,geo_hash,user_defined_collection,user_defined_bands,path,date_range)
     
     st.sidebar.success("Successfully zipped gif file!")
 
@@ -130,7 +130,6 @@ def _download_tifs_btn(data: str, disabled: bool) -> None:
 def _download_gifs_btn(gif_bytes: str, disabled: bool) -> None:
     st.sidebar.download_button(
             label=BTN_LABEL_DOWNLOAD_GIFS,
-            #key="make_gif",
             data=gif_bytes,
             file_name="gif.zip",
             on_click=_compute_gif,
@@ -172,13 +171,13 @@ def create_histogram(paths, array, tif_selectbox, selected_bands):
         print(array.shape)
         print("name: ", tif_selectbox)
         filenames = [path.name for path in paths]
-        data_distributions = array.squeeze(axis=-1)  # Remove the singleton dimension
+        data_distributions = array.squeeze(axis=-1)  
         histogram_traces = []
         for filename, distribution_data in zip(filenames, data_distributions):
             if filename == tif_selectbox:
                 histogram_trace = go.Histogram(x=distribution_data.flatten(), name=filename, histnorm='probability')
                 histogram_traces.append(histogram_trace)
-        if histogram_traces:  # Check if any histogram traces were created
+        if histogram_traces:  
             layout = go.Layout(title='Pixel Value Distribution Plot', xaxis=dict(title='Pixel Value'), yaxis=dict(title='Frequency'))
             fig = go.Figure(data=histogram_traces, layout=layout)
             st.plotly_chart(fig)
@@ -193,11 +192,10 @@ def create_histogram(paths, array, tif_selectbox, selected_bands):
             for filename, distribution_data in zip(filenames, array):
                 if filename == tif_selectbox:
                     for i in range(len(selected_bands)):
-                        # Extract each array for a single distribution
                         distribution_array = distribution_data[i]
                         histogram_trace = go.Histogram(x=distribution_array.flatten(), name=f'{filename} - {selected_bands[i]}', histnorm='probability')
                         histogram_traces.append(histogram_trace)
-            if histogram_traces:  # Check if any histogram traces were created
+            if histogram_traces:  
                 layout = go.Layout(title='Pixel Value Distribution Plot', xaxis=dict(title='Pixel Value'), yaxis=dict(title='Frequency'))
                 fig = go.Figure(data=histogram_traces, layout=layout)
                 st.plotly_chart(fig)
@@ -205,10 +203,6 @@ def create_histogram(paths, array, tif_selectbox, selected_bands):
                 st.write(f"No histogram data found for '{tif_selectbox}'.")
         
 
-
-# def trigger_functions(folium_output, geo_hash, progress_bar):
-#     _check_area_and_compute_tif(folium_output, geo_hash, progress_bar)
-#     create_histogram()
 
 def plot_images(create_histogram, geo_hash, date_range,folium_output,user_defined_collection ,user_defined_bands):
 
@@ -277,9 +271,26 @@ def plot_images(create_histogram, geo_hash, date_range,folium_output,user_define
                     st.pyplot(fig)
 
 
-def toggle_instructions():
-    st.session_state.show_instructions = not st.session_state.show_instructions
+# def toggle_instructions():
+#     st.session_state.show_instructions = not st.session_state.show_instructions
 
+
+def date_range_selector():
+    today = datetime.datetime.now()
+    this_year = today.year
+
+    five_years_ago = this_year - 5
+    five_years_ago_jan_1 = datetime.date(five_years_ago, 1, 1)
+
+    d = st.date_input(
+            "Select your time range",
+            (five_years_ago_jan_1, today),  
+            five_years_ago_jan_1,  
+            today,  
+            format="DD.MM.YYYY",
+        )
+    
+    return d
 
 if __name__ == "__main__":
     st.set_page_config(
@@ -336,34 +347,12 @@ if __name__ == "__main__":
 
 
 
-
-
-
     # Getting Started container
     with st.sidebar.container():
 
-
-        today = datetime.datetime.now()
-        this_year = today.year
-
-        #jan_1 = datetime.date(this_year, 1, 1)
-        #dec_31 = datetime.date(this_year, 12, 31)
-
-        five_years_ago = this_year - 5
-        five_years_ago_jan_1 = datetime.date(five_years_ago, 1, 1)
-        #five_years_ago_dec_31 = datetime.date(five_years_ago, 12, 31)
-
-        d = st.date_input(
-            "Select your time range",
-            (five_years_ago_jan_1, today),  
-            five_years_ago_jan_1,  
-            today,  
-            format="DD.MM.YYYY",
-        )
-        
+        d = date_range_selector()
         date_range=str('/'.join(map(str, d)))
-        print(date_range)
-
+        
 
         if 'selected_collection' not in st.session_state:
             st.session_state.selected_collection = st.selectbox('Select a collection', (collection_data.keys()))
@@ -377,21 +366,6 @@ if __name__ == "__main__":
                 selected_bands = st.multiselect('Select bands', collection_data[selected_collection])
                 st.session_state.selected_bands = selected_bands
 
-        # st.markdown(
-        #     f"""
-        #     # Getting Started
-        #     1. Zoom to your region of interest
-        #     2. Click the black square on the map
-        #     3. Draw a rectangle on the map
-        #     4. Click on <kbd>{BTN_LABEL_CREATE_TIF}</kbd>
-        #     """,
-        #     unsafe_allow_html=True,
-        # )
-
-        
-        
-
-
 
         find_tifs_button=st.button(
             BTN_LABEL_CREATE_TIF,
@@ -402,20 +376,6 @@ if __name__ == "__main__":
             disabled=False if geo_hash else True,
         )
 
-        
-
-                
-
-        # st.markdown(
-        #     f"""
-        #     5. Wait for the computation to finish
-        #     6. Click on <kbd>{BTN_LABEL_DOWNLOAD_TIFS}</kbd>
-        #     or <kbd>{BTN_LABEL_DOWNLOAD_GIFS}</kbd>
-        #     """,
-        #     unsafe_allow_html=True,
-        # )
-
-        
         output_tifs_file = TMPDIR() / f"{geo_hash}.zip"
         if output_tifs_file.is_file():
             with open(output_tifs_file, "rb") as fp:
@@ -423,23 +383,22 @@ if __name__ == "__main__":
         else:
             _download_tifs_btn(b"None", True)
 
-     
-            
-        
-        output_gifs_file = TMPDIR() / "gif.zip"
+
+        output_gifs_file = GIFTMPDIR() / f"{geo_hash}.zip"
+        download_enabled = False
         if output_gifs_file.is_file():
+            download_enabled = True
             with open(output_gifs_file, "rb") as fp:
                 gif_bytes = fp.read()
-                
-                _download_gifs_btn(gif_bytes,False)
-                
+                if download_enabled:
+                    time.sleep(4)
+                    _download_gifs_btn(gif_bytes,False)         
         else:
             _download_gifs_btn(b"None", True)
 
 
         st.sidebar.markdown("---")
 
-     # Customization container
     with st.sidebar.container():
         st.write(
              """
@@ -447,24 +406,16 @@ if __name__ == "__main__":
              Please view the table below for more information about your band selection
              """
          )
-        
-        selected_collection=st.session_state.selected_collection 
-        
+                
         if 'selected_collection' not in st.session_state:
             selected_collection = st.table(get_band_metadata(selected_collection))
         else:
             selected_collection= st.table(get_band_metadata(selected_collection))
            
 
-        # tiling_option = st.selectbox(
-        #     label=TilingSelect.label,
-        #     options=TilingSelect.options,
-        #     help=TilingSelect.help,
-        # )
+   
   
   #Outside of the sidebar  
-
-
     if 'tif_button_clicked' not in st.session_state:
         st.session_state.tif_button_clicked = False
 
@@ -485,10 +436,6 @@ if __name__ == "__main__":
         
         
 
-               
-
-            #else:   
-            #    st.write(f"No image data found for '{tif_selectbox}'.")
 
                 
                 

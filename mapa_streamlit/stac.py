@@ -22,7 +22,7 @@ from mapa_streamlit import conf
 from mapa_streamlit.caching import get_hash_of_geojson
 from mapa_streamlit.cleaning import _delete_files_in_dir, run_cleanup_job
 from mapa_streamlit.exceptions import NoSTACItemFound
-from mapa_streamlit.utils import TMPDIR, ProgressBar
+from mapa_streamlit.utils import GIFTMPDIR, TMPDIR, ProgressBar
 import pystac_client
 
 from mapa_streamlit.zip import create_gif_zip_archive, create_zip_archive
@@ -163,7 +163,7 @@ def get_band_metadata(collection:str):
     
     return df
 
-def filter(bands,resolution,items,bbox,perc_thresh):
+def filter(bands,resolution,items,bbox,perc_thresh):#remove perc_thresh
     stack = stackstac.stack(items, bounds_latlon=bbox, resolution=resolution,epsg=None)
 
     data = stack.sel(band=bands)
@@ -181,7 +181,7 @@ def save_gif(gif):
     path=filename
     return path
 
-def create_and_save_gif(geojson,user_defined_collection,user_defined_bands,output_file,date_range,compress=True)->Path:
+def create_and_save_gif(geojson,geo_hash,user_defined_collection,user_defined_bands,output_file,date_range,compress=True)->Path:
     gif_path_list=[]
     items=search_stac_for_items(user_defined_collection, geojson,date_range)
     print("#########################items!:",items)
@@ -196,13 +196,13 @@ def create_and_save_gif(geojson,user_defined_collection,user_defined_bands,outpu
     gif_path_list.append(path)
     print(path)
     print(output_file)
-    # mapa_cache_dir = TMPDIR()
+    # mapa_cache_dir = GIFTMPDIR()
     # run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=60)
     # path = mapa_cache_dir / geo_hash
-    #_delete_files_in_dir(TMPDIR(), ".zip")
-    output_file=TMPDIR()/"gif.zip"
+    # _delete_files_in_dir(GIFTMPDIR(), ".zip")
+    #output_file=GIFTMPDIR()/"gif.zip"
     if compress:
-        return create_gif_zip_archive(files=gif_path_list, output_file=output_file)
+        return create_gif_zip_archive(files=gif_path_list, output_file=f"{output_file}.zip")
     else:
         return gif_path_list[0] if len(gif_path_list) == 1 else gif_path_list
 

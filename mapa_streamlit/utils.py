@@ -12,6 +12,12 @@ def TMPDIR() -> Path:
         tmpdir.mkdir()
     return tmpdir
 
+def GIFTMPDIR() -> Path:
+    tmpdir = Path(tempfile.gettempdir()) / "mapa" /"gif"
+    if not tmpdir.is_dir():
+        tmpdir.mkdir()
+    return tmpdir
+
 
 def path_to_merged_tiff(bbox_hash: str, cache_dir: Path) -> Path:
     return cache_dir / f"merged_{bbox_hash}.tiff"
