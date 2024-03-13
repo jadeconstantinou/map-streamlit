@@ -189,9 +189,9 @@ def create_and_save_gif(geojson,geo_hash,user_defined_collection,user_defined_ba
     bbox = _turn_geojson_into_bbox(geojson)
     print(bbox)
 
-    ts=filter(user_defined_bands,10,items,bbox,perc_thresh=95) #check with band that is 30m if this 10m would work
+    ts=filter(user_defined_bands,10,items,bbox,perc_thresh=1) #check with band that is 30m if this 10m would work
     print(ts)
-    gif=dgif(ts,fps=0.5,cmap="Greys",date_color=(0, 0, 0), date_bg=None, date_position="lr", date_format="%Y-%m-%d_%H:%M:%S", bytes=True).compute()
+    gif=dgif(ts,fps=0.5, date_bg=(34, 229, 235),date_color=(0, 0, 0),date_position="lr", date_format="%Y-%m-%d_%H:%M:%S", bytes=True).compute()#cmap="Greys",
     path=save_gif(gif)
     gif_path_list.append(path)
     print(path)

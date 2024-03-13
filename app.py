@@ -271,8 +271,8 @@ def plot_images(create_histogram, geo_hash, date_range,folium_output,user_define
                     st.pyplot(fig)
 
 
-# def toggle_instructions():
-#     st.session_state.show_instructions = not st.session_state.show_instructions
+def toggle_instructions():
+    st.session_state.show_instructions = not st.session_state.show_instructions
 
 
 def date_range_selector():
@@ -383,18 +383,21 @@ if __name__ == "__main__":
         else:
             _download_tifs_btn(b"None", True)
 
+        if len(selected_bands) == 1 or len(selected_bands)==3:
+            output_gifs_file = GIFTMPDIR() / f"{geo_hash}.zip"
+            download_enabled = False
+            if output_gifs_file.is_file():
+                download_enabled = True
+                with open(output_gifs_file, "rb") as fp:
+                    gif_bytes = fp.read()
+                    if download_enabled:
+                        time.sleep(4)
+                        _download_gifs_btn(gif_bytes,False)         
+            else:
+                _download_gifs_btn(b"None", True)
 
-        output_gifs_file = GIFTMPDIR() / f"{geo_hash}.zip"
-        download_enabled = False
-        if output_gifs_file.is_file():
-            download_enabled = True
-            with open(output_gifs_file, "rb") as fp:
-                gif_bytes = fp.read()
-                if download_enabled:
-                    time.sleep(4)
-                    _download_gifs_btn(gif_bytes,False)         
-        else:
-            _download_gifs_btn(b"None", True)
+        else: 
+            st.write("To create a gif select 1 or 3 bands.")
 
 
         st.sidebar.markdown("---")
@@ -410,7 +413,8 @@ if __name__ == "__main__":
         if 'selected_collection' not in st.session_state:
             selected_collection = st.table(get_band_metadata(selected_collection))
         else:
-            selected_collection= st.table(get_band_metadata(selected_collection))
+            selected_collection= st.table(get_band_metadata(st.session_state.selected_collection))
+            selected_collection=st.session_state.selected_collection
            
 
    
