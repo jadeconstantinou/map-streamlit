@@ -184,27 +184,19 @@ def save_gif(gif):
 def create_and_save_gif(geojson,geo_hash,user_defined_collection,user_defined_bands,output_file,date_range,compress=True)->Path:
     gif_path_list=[]
     items=search_stac_for_items(user_defined_collection, geojson,date_range)
-    print("#########################items!:",items)
-    print(len(items))
+    if not items:
+        print("No items found to create a GIF.")
+        return None
+    
     bbox = _turn_geojson_into_bbox(geojson)
-    print(bbox)
-
+    
     ts=filter(user_defined_bands,10,items,bbox,perc_thresh=1) #check with band that is 30m if this 10m would work
-    print(ts)
     gif=dgif(ts,fps=0.5, date_bg=(34, 229, 235),date_color=(0, 0, 0),date_position="lr", date_format="%Y-%m-%d_%H:%M:%S", bytes=True).compute()#cmap="Greys",
     path=save_gif(gif)
     gif_path_list.append(path)
-    print(path)
-    print(output_file)
-    # mapa_cache_dir = GIFTMPDIR()
-    # run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=60)
-    # path = mapa_cache_dir / geo_hash
-    # _delete_files_in_dir(GIFTMPDIR(), ".zip")
-    #output_file=GIFTMPDIR()/"gif.zip"
-    if compress:
-        return create_gif_zip_archive(files=gif_path_list, output_file=f"{output_file}.zip")
-    else:
-        return gif_path_list[0] if len(gif_path_list) == 1 else gif_path_list
+    
+
+    return gif_path_list[0] if len(gif_path_list) == 1 else gif_path_list
 
     #return path,gif
 

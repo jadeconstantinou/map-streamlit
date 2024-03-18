@@ -1,3 +1,4 @@
+import base64
 import datetime
 import logging
 import os
@@ -67,7 +68,7 @@ def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collecti
     run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
     path = mapa_cache_dir / geo_hash
     progress_bar.progress(0)
-    convert_bbox_to_tif(
+    path=convert_bbox_to_tif(
         user_defined_collection=user_defined_collection, 
         user_defined_bands=user_defined_bands,
         bbox_geometry=geometry,
@@ -76,7 +77,10 @@ def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collecti
         date_range=date_range,
         split_area_in_tiles= "1x1",
     )
-    st.sidebar.success("Successfully requested tif file!")
+    if path is None:
+        st.warning("No images found to create a .tifs.")
+    else:
+        st.sidebar.success("Successfully requested tif file!")
 
 
 def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar: st.progress,date_range:str) -> None:
@@ -115,9 +119,15 @@ def _compute_gif(folium_output: dict, geo_hash: str,date_range:str):
     run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
     path = mapa_cache_dir / geo_hash
 
-    create_and_save_gif(geometry,geo_hash,user_defined_collection,user_defined_bands,path,date_range)
+    gif_path=create_and_save_gif(geometry,geo_hash,user_defined_collection,user_defined_bands,path,date_range)
     
-    st.sidebar.success("Successfully zipped gif file!")
+    st.sidebar.success("Successfully generated gif file!")
+    return gif_path
+
+def get_binary_file_downloader_html(bin_data, file_label='File'):
+    bin_str = base64.b64encode(bin_data).decode()
+    href = f'<a href="data:image/gif;base64,{bin_str}" download="generated.gif">Click to Download {file_label}</a>'
+    return href
 
 def _download_tifs_btn(data: str, disabled: bool) -> None:
     st.sidebar.download_button(
@@ -203,6 +213,18 @@ def create_histogram(paths, array, tif_selectbox, selected_bands):
                 st.write(f"No histogram data found for '{tif_selectbox}'.")
         
 
+@st.cache_data()
+def fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection, geometry, date_range):
+    paths, array, xx = fetch_stac_items_for_bbox(
+        user_defined_bands,
+        user_defined_collection,
+        geometry,
+        allow_caching=True,
+        cache_dir=TMPDIR(),
+        date_range=date_range,
+        progress_bar=None
+    )
+    return paths, array, xx
 
 def plot_images(create_histogram, geo_hash, date_range,folium_output,user_defined_collection ,user_defined_bands):
 
@@ -212,15 +234,8 @@ def plot_images(create_histogram, geo_hash, date_range,folium_output,user_define
         }
     geometry = all_drawings_dict[geo_hash]
 
-    paths, array,xx = fetch_stac_items_for_bbox(
-            user_defined_bands,
-            user_defined_collection,
-            geometry,
-            allow_caching=True,
-            cache_dir=TMPDIR(),
-            date_range=date_range,
-            progress_bar=None
-        )
+    paths, array, xx = fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection, geometry, date_range)
+
 
     filenames = [path.name for path in paths]
     filenames = list(dict.fromkeys(filenames))
@@ -383,18 +398,17 @@ if __name__ == "__main__":
         else:
             _download_tifs_btn(b"None", True)
 
-        if len(selected_bands) == 1 or len(selected_bands)==3:
-            output_gifs_file = GIFTMPDIR() / f"{geo_hash}.zip"
-            download_enabled = False
-            if output_gifs_file.is_file():
-                download_enabled = True
-                with open(output_gifs_file, "rb") as fp:
-                    gif_bytes = fp.read()
-                    if download_enabled:
-                        time.sleep(4)
-                        _download_gifs_btn(gif_bytes,False)         
-            else:
-                _download_gifs_btn(b"None", True)
+        if len(st.session_state.selected_bands) == 1 or len(st.session_state.selected_bands)==3:
+                if st.button("Generate GIF",disabled=False if geo_hash else True):
+   
+                    gif_path = _compute_gif(output, geo_hash, date_range)
+                    if gif_path is None:
+                        st.warning("No images found to create a GIF.")
+                    else:
+                        with open(gif_path, "rb") as f:
+                            gif_bytes = f.read()
+                        st.markdown(get_binary_file_downloader_html(gif_bytes, "GIF"), unsafe_allow_html=True)      
+           
 
         else: 
             st.write("To create a gif select 1 or 3 bands.")
@@ -437,6 +451,14 @@ if __name__ == "__main__":
         
         plot_images(create_histogram, geo_hash, date_range,output,st.session_state.selected_collection, st.session_state.selected_bands)
 
+
+
+    
+
+
+
+
+        
         
         
 
