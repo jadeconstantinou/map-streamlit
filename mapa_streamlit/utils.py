@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import tempfile
 from pathlib import Path
@@ -25,15 +24,6 @@ def path_to_merged_tiff(bbox_hash: str, cache_dir: Path) -> Path:
 
 def path_to_clipped_tiff(bbox_hash: str, cache_dir: Path) -> Path:
     return cache_dir / f"clipped_{bbox_hash}.tiff"
-
-
-def md5_sum(path: Path) -> str:
-    hash_md5 = hashlib.md5()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
 
 class ProgressBar:
     def __init__(self, progress_bar: object, steps: int = 0) -> None:

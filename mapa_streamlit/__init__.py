@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from mapa_streamlit.exceptions import NoSTACItemFound
 import tomli
 
 import logging
@@ -7,16 +8,11 @@ import os
 from pathlib import Path
 from typing import List, Union
 
-import numpy as np
-import rasterio as rio
 
-from mapa_streamlit import conf
-from mapa_streamlit.caching import get_hash_of_geojson, tiff_for_bbox_is_cached
 
 from mapa_streamlit.stac import fetch_stac_items_for_bbox
 from mapa_streamlit.tiling import get_x_y_from_tiles_format, split_array_into_tiles
 from mapa_streamlit.utils import TMPDIR, ProgressBar, path_to_clipped_tiff
-from mapa_streamlit.verification import verify_input_and_output_are_valid
 from mapa_streamlit.zip import create_zip_archive
 
 log = logging.getLogger(__name__)
@@ -76,11 +72,9 @@ def convert_bbox_to_tif(
         Path or list of paths to the resulting output file(s) on your local machine.
     """
 
-    # fail early in case of missing requirements
     if bbox_geometry is None:
         raise ValueError("⛔️  ERROR: make sure to draw a rectangle on the map first!")
 
-    # evaluate tile format to fail early in case of invalid input value
     tiles = get_x_y_from_tiles_format(split_area_in_tiles)
 
     args = locals().copy()
@@ -91,22 +85,28 @@ def convert_bbox_to_tif(
         steps = tiles.x * tiles.y * 2 if compress else tiles.x * tiles.y
         progress_bar = ProgressBar(progress_bar=progress_bar, steps=steps)
 
-    list_paths_to_tiffs,arr,xx=fetch_stac_items_for_bbox(user_defined_bands,
-    user_defined_collection,
-    bbox_geometry,
-    allow_caching,
-    cache_dir,
-    date_range,
-    progress_bar)    
-    print("######################",list_paths_to_tiffs)
+    try:
+        list_paths_to_tiffs,arr,xx=fetch_stac_items_for_bbox(user_defined_bands,
+        user_defined_collection,
+        bbox_geometry,
+        allow_caching,
+        cache_dir,
+        date_range,
+        progress_bar)    
+        print("######################",list_paths_to_tiffs)
+
+        if progress_bar:
+            progress_bar.step()
+        if compress:
+            return create_zip_archive(files=list_paths_to_tiffs, output_file=f"{output_file}.zip", progress_bar=progress_bar)
+        else:
+            return list_paths_to_tiffs[0] if len(list_paths_to_tiffs) == 1 else list_paths_to_tiffs
+
+    except NoSTACItemFound as e:
+        print("No STAC items found for the given bounding box and date range.")
+        return None
 
 
-    if progress_bar:
-        progress_bar.step()
-    if compress:
-        return create_zip_archive(files=list_paths_to_tiffs, output_file=f"{output_file}.zip", progress_bar=progress_bar)
-    else:
-        return list_paths_to_tiffs[0] if len(list_paths_to_tiffs) == 1 else list_paths_to_tiffs
     
 
 

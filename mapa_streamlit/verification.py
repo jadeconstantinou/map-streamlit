@@ -9,12 +9,7 @@ from mapa_streamlit import conf
 
 log = logging.getLogger(__name__)
 
-def verify_input_and_output_are_valid(input: str, output: str) -> Path:
-    _verify_input_is_valid(input)
-    if output is None:
-        output = Path.home() / str(Path(input).name).replace(".tiff", ".stl").replace(".tif", ".stl")
-    _verify_output_is_valid(output)
-    return output
+
 
 
 def _verify_input_is_valid(input: str):

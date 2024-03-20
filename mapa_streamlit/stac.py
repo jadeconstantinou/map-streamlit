@@ -2,8 +2,7 @@ import logging
 import warnings
 from pydantic import PydanticDeprecatedSince20
 from pathlib import Path
-from typing import Any, List, Tuple, Union
-from urllib import request
+from typing import List, Tuple, Union
 from odc.stac import stac_load
 import rasterio as rio
 import pandas as pd
@@ -11,21 +10,14 @@ import numpy as np
 import rioxarray
 from pathlib import Path
 from geogif import dgif
-
-
 import geojson
-from pystac.item import Item
-from pystac_client import Client
 import stackstac
 
 from mapa_streamlit import conf
-from mapa_streamlit.caching import get_hash_of_geojson
-from mapa_streamlit.cleaning import _delete_files_in_dir, run_cleanup_job
 from mapa_streamlit.exceptions import NoSTACItemFound
-from mapa_streamlit.utils import GIFTMPDIR, TMPDIR, ProgressBar
+from mapa_streamlit.utils import ProgressBar
 import pystac_client
 
-from mapa_streamlit.zip import create_gif_zip_archive, create_zip_archive
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
     import planetary_computer
@@ -122,7 +114,7 @@ def fetch_stac_items_for_bbox(
         print("######",paths)
         return paths, array, xx
     else:
-        raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box.")
+        raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box and date range.")
 
 def search_stac_for_items(user_defined_collection, geojson,date_range):
     bbox = _turn_geojson_into_bbox(geojson)
@@ -133,7 +125,7 @@ def search_stac_for_items(user_defined_collection, geojson,date_range):
     )
 
     search = catalog.search(
-        collections=[user_defined_collection],  # landsat-c2-l2, sentinel-2-l2a
+        collections=[user_defined_collection],
         bbox=bbox,
         datetime=date_range,
         query={
@@ -198,7 +190,6 @@ def create_and_save_gif(geojson,geo_hash,user_defined_collection,user_defined_ba
 
     return gif_path_list[0] if len(gif_path_list) == 1 else gif_path_list
 
-    #return path,gif
 
 
 
