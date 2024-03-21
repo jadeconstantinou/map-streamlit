@@ -12,6 +12,7 @@ from pathlib import Path
 from geogif import dgif
 import geojson
 import stackstac
+import requests
 
 from mapa_streamlit import conf
 from mapa_streamlit.exceptions import NoSTACItemFound
@@ -77,7 +78,24 @@ def save_images_from_xarr(xarray, filepath, bands:list, collection:str, datatype
                 paths.append(filepath/filename)
     return paths,array
 
+def get_mtl_metadata(items,filepath):
+    paths=[]
+    for count,item in enumerate(items):
+        assets=items[count].assets.items()
+        dict_assets=dict(assets)
+        xml=dict_assets.get('mtl.xml')
 
+        mtl_xml_url = xml.href
+        response = requests.get(mtl_xml_url)
+
+        if response.status_code == 200:
+            filename=f'mtl_{item.id}.xml'
+            with open(filepath/filename, 'wb') as f:
+                f.write(response.content)
+                paths.append(filepath/filename)
+            return paths
+        else:
+            print("Failed to download:", response.status_code)
 
 def fetch_stac_items_for_bbox(
     user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, date_range:str,progress_bar: Union[None, ProgressBar] = None, 
@@ -107,12 +125,17 @@ def fetch_stac_items_for_bbox(
     if n > 0:
         log.info(f"⬇️  fetching {n} stac items...")
         
-        paths,array=save_images_from_xarr(xx,cache_dir,user_defined_bands,user_defined_collection)
+        tif_paths,array=save_images_from_xarr(xx,cache_dir,user_defined_bands,user_defined_collection)
+
+        mtl_paths = get_mtl_metadata(items,cache_dir)
+
+        tif_and_metadata_path=tif_paths+mtl_paths
+
         
         if progress_bar:
             progress_bar.step()
-        print("######",paths)
-        return paths, array, xx
+        print("######",tif_and_metadata_path)
+        return tif_and_metadata_path, array, xx
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box and date range.")
 
@@ -191,7 +214,22 @@ def create_and_save_gif(geojson,geo_hash,user_defined_collection,user_defined_ba
     return gif_path_list[0] if len(gif_path_list) == 1 else gif_path_list
 
 
+def get_xml_metadata(items):
 
+    assets=items[0].assets.items()
+    dict_assets=dict(assets)
+    xml_item=dict_assets.get('mtl.xml')
+
+    mtl_xml_url = xml_item.href
+
+    response = requests.get(mtl_xml_url)
+
+    if response.status_code == 200:
+        with open('mtl.xml', 'wb') as f:
+            f.write(response.content)
+        print("Download successful!")
+    else:
+        print("Failed to download:", response.status_code)
 
 
     

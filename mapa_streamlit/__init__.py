@@ -86,21 +86,22 @@ def convert_bbox_to_tif(
         progress_bar = ProgressBar(progress_bar=progress_bar, steps=steps)
 
     try:
-        list_paths_to_tiffs,arr,xx=fetch_stac_items_for_bbox(user_defined_bands,
+        tif_and_metadata_paths,arr,xx=fetch_stac_items_for_bbox(user_defined_bands,
         user_defined_collection,
         bbox_geometry,
         allow_caching,
         cache_dir,
         date_range,
         progress_bar)    
-        print("######################",list_paths_to_tiffs)
+        print("######################",tif_and_metadata_paths)
 
         if progress_bar:
             progress_bar.step()
         if compress:
-            return create_zip_archive(files=list_paths_to_tiffs, output_file=f"{output_file}.zip", progress_bar=progress_bar)
+            print("TESTING",tif_and_metadata_paths)
+            return create_zip_archive(files=tif_and_metadata_paths, output_file=f"{output_file}.zip", progress_bar=progress_bar)
         else:
-            return list_paths_to_tiffs[0] if len(list_paths_to_tiffs) == 1 else list_paths_to_tiffs
+            return tif_and_metadata_paths[0] if len(tif_and_metadata_paths) == 1 else tif_and_metadata_paths
 
     except NoSTACItemFound as e:
         print("No STAC items found for the given bounding box and date range.")
