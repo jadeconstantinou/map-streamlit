@@ -27,6 +27,7 @@ def convert_bbox_to_tif(
     user_defined_bands:list,
     bbox_geometry: dict,
     date_range:str,
+    cloud_cover_percentage_value:int,
     output_file: str = "output",
     split_area_in_tiles: str = "1x1",
     compress: bool = True,
@@ -92,6 +93,7 @@ def convert_bbox_to_tif(
         allow_caching,
         cache_dir,
         date_range,
+        cloud_cover_percentage_value,
         progress_bar)    
         print("######################",tif_and_metadata_paths)
 

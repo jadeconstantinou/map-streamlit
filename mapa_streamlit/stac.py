@@ -99,10 +99,10 @@ def get_mtl_metadata(items,filepath):
             print("Failed to download:", response.status_code)
     return paths
 def fetch_stac_items_for_bbox(
-    user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, date_range:str,progress_bar: Union[None, ProgressBar] = None, 
+    user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, date_range:str, cloud_cover_percentage_value:int, progress_bar: Union[None, ProgressBar] = None, 
 ) -> Tuple:
     
-    items = search_stac_for_items(user_defined_collection, geojson,date_range)
+    items = search_stac_for_items(user_defined_collection, geojson,date_range,cloud_cover_percentage_value)
 
     patch_url = None
     if are_stac_items_planetary_computer(items):
@@ -143,7 +143,7 @@ def fetch_stac_items_for_bbox(
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box and date range.")
 
-def search_stac_for_items(user_defined_collection, geojson,date_range):
+def search_stac_for_items(user_defined_collection, geojson,date_range,cloud_cover_percentage_value):
     bbox = _turn_geojson_into_bbox(geojson)
     
     catalog = pystac_client.Client.open(
@@ -156,7 +156,7 @@ def search_stac_for_items(user_defined_collection, geojson,date_range):
         bbox=bbox,
         datetime=date_range,
         query={
-            "eo:cloud_cover": {"lt": 20},
+            "eo:cloud_cover": {"lt": cloud_cover_percentage_value},
         },
     )
     items = search.get_all_items()

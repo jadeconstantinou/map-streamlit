@@ -61,7 +61,7 @@ def _show_map(center: List[float], zoom: int) -> folium.Map:
     return m
 
 
-def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collection,user_defined_bands,date_range) -> None:
+def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collection,user_defined_bands,date_range,cloud_cover_percentage_value:int) -> None:
     geo_hash = get_hash_of_geojson(geometry)
     mapa_cache_dir = TMPDIR()
     run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
@@ -74,6 +74,7 @@ def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collecti
         output_file=path,
         progress_bar=progress_bar,
         date_range=date_range,
+        cloud_cover_percentage_value=cloud_cover_percentage_value,
         split_area_in_tiles= "1x1",
     )
     if path is None:
@@ -93,14 +94,14 @@ def warn_outside_boundary():
         "right. Ensure to use the initial center view of the world for drawing your rectangle."
     )
 
-def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar: st.progress, date_range: str) -> None:
+def _check_area_and_compute_tif(folium_output: dict, geo_hash: str, progress_bar: st.progress, date_range: str,cloud_cover_percentage_value:int) -> None:
     user_defined_collection, user_defined_bands, geometry = extract_parameters(folium_output, geo_hash)
     if selected_bbox_too_large(geometry, threshold=MAX_ALLOWED_AREA_SIZE):
         warn_large_region()
     elif not selected_bbox_in_boundary(geometry):
         warn_outside_boundary()
     else:
-        _compute_tif(geometry, progress_bar, user_defined_collection, user_defined_bands, date_range)
+        _compute_tif(geometry, progress_bar, user_defined_collection, user_defined_bands, date_range,cloud_cover_percentage_value)
 
 
 def extract_parameters(folium_output, geo_hash):
@@ -213,7 +214,7 @@ def create_histogram(paths, array, tif_selectbox, selected_bands):
         
 
 @st.cache_data()
-def fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection, geometry, date_range):
+def fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection, geometry, date_range,cloud_cover_percentage_value):
     try: 
         paths, array, xx = fetch_stac_items_for_bbox(
         user_defined_bands,
@@ -222,6 +223,7 @@ def fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection
         allow_caching=True,
         cache_dir=TMPDIR(),
         date_range=date_range,
+        cloud_cover_percentage_value=cloud_cover_percentage_value,
         progress_bar=None
         )
         return paths, array, xx
@@ -230,7 +232,7 @@ def fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection
         print("No STAC items found for the given bounding box and date range.")
         return None
 
-def plot_images(create_histogram, geo_hash, date_range,folium_output):
+def plot_images(create_histogram, geo_hash, date_range,folium_output,cloud_cover_percentage_value):
 
     user_defined_collection, user_defined_bands, geometry = extract_parameters(folium_output, geo_hash)
 
@@ -240,7 +242,7 @@ def plot_images(create_histogram, geo_hash, date_range,folium_output):
         warn_outside_boundary()
     else:
  
-        stac_result = fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection, geometry, date_range)
+        stac_result = fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection, geometry, date_range,cloud_cover_percentage_value)
         if stac_result is None:
             st.warning("No images found for the given bounding box and date range to plot")
         else:
@@ -307,7 +309,7 @@ def date_range_selector():
     five_years_ago_jan_1 = datetime.date(five_years_ago, 1, 1)
 
     d = st.date_input(
-            "Select your time range",
+            "Select time range",
             (five_years_ago_jan_1, today),  
             five_years_ago_jan_1,  
             today,  
@@ -345,11 +347,12 @@ if __name__ == "__main__":
             f"""
              1. Zoom to your region of interest on the map &nbsp; 🌍 &nbsp;
              2. Click the black square on the map to draw a polygon
-             3. Select date range, collection and up to 3 bands in the sidebar dropdown menus. If you need more information about the bands, scroll down on the sidebar to find a band metadata table
-             3. Click on <kbd>{BTN_LABEL_CREATE_TIF}</kbd>
+             3. Select date range, collection and up to 3 bands in the sidebar dropdown menus. If you need more information about the bands, scroll down on the sidebar to find a band metadata table. 
+             Note: Selecting more than one band per request will stack the bands together into one tif. 
+             4. Click on <kbd>{BTN_LABEL_CREATE_TIF}</kbd>
              4. Wait for the computation to finish
              5. Below the map, view the 'Requested tif information' to view images and their pixel value distribution
-             5. Click on <kbd>{BTN_LABEL_DOWNLOAD_TIFS}</kbd> or <kbd>{BTN_LABEL_DOWNLOAD_GIFS}</kbd> 
+             6. Click on <kbd>{BTN_LABEL_DOWNLOAD_TIFS}</kbd> or <kbd>{BTN_LABEL_DOWNLOAD_GIFS}</kbd> 
             
              """,
             unsafe_allow_html=True,)
@@ -376,6 +379,8 @@ if __name__ == "__main__":
 
         d = date_range_selector()
         date_range=str('/'.join(map(str, d)))
+
+        cloud_cover_percentage_value = st.slider('Select cloud cover percentage threshold', 0, 100, 20)
         
 
         if 'selected_collection' not in st.session_state:
@@ -395,7 +400,7 @@ if __name__ == "__main__":
             BTN_LABEL_CREATE_TIF,
             key="find_tifs_button",
             on_click=_check_area_and_compute_tif, 
-            kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar, "date_range":date_range},
+            kwargs={"folium_output": output, "geo_hash": geo_hash, "progress_bar": progress_bar, "date_range":date_range,"cloud_cover_percentage_value":cloud_cover_percentage_value},
             disabled=False if geo_hash else True,
         )
 
@@ -409,7 +414,7 @@ if __name__ == "__main__":
         if len(st.session_state.selected_bands) == 1 or len(st.session_state.selected_bands)==3:
                 if st.button("Generate GIF",disabled=False if geo_hash else True):
    
-                    gif_path = _compute_gif(output, geo_hash, date_range)
+                    gif_path = _compute_gif(output, geo_hash, date_range,cloud_cover_percentage_value)
                     if gif_path is None:
                         st.warning("No images found to create a GIF.")
                     else:
@@ -459,7 +464,7 @@ if __name__ == "__main__":
         
     
     
-        plot_images(create_histogram, geo_hash, date_range,output)
+        plot_images(create_histogram, geo_hash, date_range,output,cloud_cover_percentage_value)
 
 
 
