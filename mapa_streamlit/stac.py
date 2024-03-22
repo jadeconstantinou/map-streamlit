@@ -90,13 +90,14 @@ def get_mtl_metadata(items,filepath):
 
         if response.status_code == 200:
             filename=f'mtl_{item.id}.xml'
+            print("##################################################### ", filename)
             with open(filepath/filename, 'wb') as f:
                 f.write(response.content)
                 paths.append(filepath/filename)
-            return paths
+            print("----------------------------------------------------- ",paths)
         else:
             print("Failed to download:", response.status_code)
-
+    return paths
 def fetch_stac_items_for_bbox(
     user_defined_bands:list, user_defined_collection:str, geojson: dict, allow_caching: bool, cache_dir: Path, date_range:str,progress_bar: Union[None, ProgressBar] = None, 
 ) -> Tuple:
@@ -127,15 +128,18 @@ def fetch_stac_items_for_bbox(
         
         tif_paths,array=save_images_from_xarr(xx,cache_dir,user_defined_bands,user_defined_collection)
 
-        mtl_paths = get_mtl_metadata(items,cache_dir)
+        if user_defined_collection=='landsat-c2-l2':
+            mtl_paths = get_mtl_metadata(items,cache_dir)
+            paths_to_data=tif_paths+mtl_paths
 
-        tif_and_metadata_path=tif_paths+mtl_paths
+        else: 
+            paths_to_data= tif_paths
 
         
         if progress_bar:
             progress_bar.step()
-        print("######",tif_and_metadata_path)
-        return tif_and_metadata_path, array, xx
+        print("######",paths_to_data)
+        return paths_to_data, array, xx
     else:
         raise NoSTACItemFound("Could not find the desired STAC item for the given bounding box and date range.")
 
