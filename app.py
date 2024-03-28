@@ -42,10 +42,30 @@ def _show_map(center: List[float], zoom: int) -> folium.Map:
         location=center,
         zoom_start=zoom,
         control_scale=True,
-        tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-        attr='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',  # noqa: E501
+        tiles=None
     )
-    Draw(
+
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr='Map data: &copy; Esri',
+        name='Esri World Imagery'
+    ).add_to(m)
+
+    folium.TileLayer(
+        tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+        attr='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+        name='OpenTopoMap'
+    ).add_to(m)
+
+    folium.TileLayer(
+        tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attr='OpenStreetMap',
+        name='OpenStreetMap'
+    ).add_to(m)
+
+    folium.LayerControl(name='Layer Control').add_to(m)
+
+    folium.plugins.Draw(
         export=False,
         position="topleft",
         draw_options={
@@ -58,6 +78,7 @@ def _show_map(center: List[float], zoom: int) -> folium.Map:
             "rectangle": True,
         },
     ).add_to(m)
+
     return m
 
 
@@ -78,7 +99,7 @@ def _compute_tif(geometry: dict, progress_bar: st.progress,user_defined_collecti
         split_area_in_tiles= "1x1",
     )
     if path is None:
-        st.warning("No images found for the given bounding box and date range to create .tifs.")
+        st.warning("No images found for the given bounding box, date range and cloud cover percentage threshold to create .tifs.")
     else:
         st.sidebar.success("Successfully requested tif file!")
 
@@ -113,7 +134,7 @@ def extract_parameters(folium_output, geo_hash):
     geometry = all_drawings_dict[geo_hash]
     return user_defined_collection,user_defined_bands,geometry
 
-def _compute_gif(folium_output: dict, geo_hash: str,date_range:str):
+def _compute_gif(folium_output: dict, geo_hash: str,date_range:str,cloud_cover_percentage_value:int):
     
     user_defined_collection, user_defined_bands, geometry = extract_parameters(folium_output, geo_hash)
     if selected_bbox_too_large(geometry, threshold=MAX_ALLOWED_AREA_SIZE):
@@ -129,7 +150,7 @@ def _compute_gif(folium_output: dict, geo_hash: str,date_range:str):
         run_cleanup_job(path=mapa_cache_dir, disk_cleaning_threshold=DISK_CLEANING_THRESHOLD)
         path = mapa_cache_dir / geo_hash
 
-        gif_path=create_and_save_gif(geometry,geo_hash,user_defined_collection,user_defined_bands,path,date_range)
+        gif_path=create_and_save_gif(geometry,geo_hash,user_defined_collection,user_defined_bands,path,date_range,cloud_cover_percentage_value)
         
         st.sidebar.success("Successfully generated gif file!")
         return gif_path
@@ -232,7 +253,7 @@ def fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection
         print("No STAC items found for the given bounding box and date range.")
         return None
 
-def plot_images(create_histogram, geo_hash, date_range,folium_output,cloud_cover_percentage_value):
+def plot_images(geo_hash, date_range,folium_output,cloud_cover_percentage_value):
 
     user_defined_collection, user_defined_bands, geometry = extract_parameters(folium_output, geo_hash)
 
@@ -244,11 +265,11 @@ def plot_images(create_histogram, geo_hash, date_range,folium_output,cloud_cover
  
         stac_result = fetch_stac_items_for_bbox_cached(user_defined_bands, user_defined_collection, geometry, date_range,cloud_cover_percentage_value)
         if stac_result is None:
-            st.warning("No images found for the given bounding box and date range to plot")
+            st.warning("No data found for the given bounding box, date range and cloud cover percentage threshold")
         else:
             paths, array, xx=stac_result
             
-            filenames = [path.name for path in paths]
+            filenames = [path.name for path in paths if not str(path).endswith('.xml')]
             filenames = list(dict.fromkeys(filenames))
             tif_selectbox = st.selectbox("Choose an option", filenames)
             if tif_selectbox:
@@ -269,7 +290,6 @@ def plot_images(create_histogram, geo_hash, date_range,folium_output,cloud_cover
                                 
                 if len(user_defined_bands) > 1:
                     print(user_defined_bands)
-                    
                         
                     if user_defined_bands==['B02', 'B03', 'B04']:
                         user_defined_bands.reverse()
@@ -285,7 +305,7 @@ def plot_images(create_histogram, geo_hash, date_range,folium_output,cloud_cover
                     if len(user_defined_bands)==3:
                         stacked_image = np.stack(band_values_list, axis=-1)
                         
-                        
+    
                     arr_normalized = stacked_image / 10000
                     datetimes = pd.to_datetime(xx.time.values.astype('datetime64[s]')).strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -325,7 +345,6 @@ if __name__ == "__main__":
         layout="wide",
         initial_sidebar_state="expanded",      
     )
-
 
     st.markdown(
         """
@@ -377,11 +396,11 @@ if __name__ == "__main__":
     # Getting Started container
     with st.sidebar.container():
 
-        d = date_range_selector()
-        date_range=str('/'.join(map(str, d)))
-
         cloud_cover_percentage_value = st.slider('Select cloud cover percentage threshold', 0, 100, 20)
-        
+
+
+        d = date_range_selector()
+        date_range=str('/'.join(map(str, d)))        
 
         if 'selected_collection' not in st.session_state:
             st.session_state.selected_collection = st.selectbox('Select a collection', (collection_data.keys()))
@@ -461,14 +480,14 @@ if __name__ == "__main__":
         """,
         unsafe_allow_html=True,
     )
+        plot_images(geo_hash, date_range,output,cloud_cover_percentage_value)
+        st.session_state.selected_bands or st.session_state.selected_collection
+           # st.session_state.tif_button_clicked = False
+     
+
+
+
         
-    
-    
-        plot_images(create_histogram, geo_hash, date_range,output,cloud_cover_percentage_value)
-
-
-
-    
 
 
 

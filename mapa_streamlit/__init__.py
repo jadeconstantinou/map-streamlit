@@ -11,8 +11,8 @@ from typing import List, Union
 
 
 from mapa_streamlit.stac import fetch_stac_items_for_bbox
-from mapa_streamlit.tiling import get_x_y_from_tiles_format, split_array_into_tiles
-from mapa_streamlit.utils import TMPDIR, ProgressBar, path_to_clipped_tiff
+from mapa_streamlit.tiling import get_x_y_from_tiles_format
+from mapa_streamlit.utils import TMPDIR, ProgressBar
 from mapa_streamlit.zip import create_zip_archive
 
 log = logging.getLogger(__name__)

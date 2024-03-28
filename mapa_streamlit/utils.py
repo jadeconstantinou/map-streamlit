@@ -17,14 +17,6 @@ def GIFTMPDIR() -> Path:
         tmpdir.mkdir()
     return tmpdir
 
-
-def path_to_merged_tiff(bbox_hash: str, cache_dir: Path) -> Path:
-    return cache_dir / f"merged_{bbox_hash}.tiff"
-
-
-def path_to_clipped_tiff(bbox_hash: str, cache_dir: Path) -> Path:
-    return cache_dir / f"clipped_{bbox_hash}.tiff"
-
 class ProgressBar:
     def __init__(self, progress_bar: object, steps: int = 0) -> None:
         self.progress_bar = progress_bar  # streamlit st.progress_bar object

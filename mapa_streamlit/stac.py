@@ -200,9 +200,9 @@ def save_gif(gif):
     path=filename
     return path
 
-def create_and_save_gif(geojson,geo_hash,user_defined_collection,user_defined_bands,output_file,date_range,compress=True)->Path:
+def create_and_save_gif(geojson,geo_hash,user_defined_collection,user_defined_bands,output_file,date_range,cloud_cover_percentage_value,compress=True)->Path:
     gif_path_list=[]
-    items=search_stac_for_items(user_defined_collection, geojson,date_range)
+    items=search_stac_for_items(user_defined_collection, geojson,date_range,cloud_cover_percentage_value)
     if not items:
         print("No items found to create a GIF.")
         return None
