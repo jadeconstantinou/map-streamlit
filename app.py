@@ -473,21 +473,25 @@ if __name__ == "__main__":
         st.session_state.tif_button_clicked = True
 
     if st.session_state.tif_button_clicked:
-        st.markdown(
-        """
-        # Requested tif information
-        Please use the dropdown box to investigate your queried data.
-        """,
-        unsafe_allow_html=True,
-    )
-        plot_images(geo_hash, date_range,output,cloud_cover_percentage_value)
-        st.session_state.selected_bands or st.session_state.selected_collection
-           # st.session_state.tif_button_clicked = False
-     
-
-
-
+        if not st.session_state.selected_bands:
+            st.warning('Please select bands')
+        else:
+            st.markdown(
+            """
+            # Requested tif information
+            Please use the dropdown box to investigate your queried data.
+            """,
+            unsafe_allow_html=True,
+        )
+            
+            plot_images(geo_hash, date_range,output,cloud_cover_percentage_value)
+            st.session_state.selected_bands or st.session_state.selected_collection
+            # st.session_state.tif_button_clicked = False
         
+
+
+
+            
 
 
 

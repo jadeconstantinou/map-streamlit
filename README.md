@@ -1,6 +1,8 @@
 # mapa-streamlit 🌍
 
-This app was built by using Fabien Gebhart's mapa repo https://github.com/fgebhart/mapa as a foundation to enable the creation of this app with functionalities such as requesting more data from different collections and different bands.
+Download Sentinel 2 and Landsat data!!
+
+This app was built by using the mapa repo https://github.com/fgebhart/mapa by Fabien Gebhart as a foundation to enable the creation of this app with functionalities such as requesting more data from different collections and different bands.
 
 
 
